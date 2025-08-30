@@ -31,7 +31,7 @@ make -j4
 ### 1. 连接数据库
 
 ```cpp
-#include "yx/mysql/yxmysql.h"
+#include "yxmysql/yxmysql.h"
 
 yxmysql::ConnectionConfig config;
 config.host = "localhost";

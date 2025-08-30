@@ -1,4 +1,4 @@
-#include "yx/mysql/result_set.h"
+#include "yxmysql/result_set.h"
 #include <cstring>
 #include <cstdlib>
 #include <limits>

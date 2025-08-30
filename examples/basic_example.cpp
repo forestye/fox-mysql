@@ -1,4 +1,4 @@
-#include "yx/mysql/yxmysql.h"
+#include "yxmysql/yxmysql.h"
 #include <iostream>
 
 int main() {

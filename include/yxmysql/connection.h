@@ -1,7 +1,7 @@
 #pragma once
 
-#include "yx/mysql/types.h"
-#include "yx/mysql/exception.h"
+#include "yxmysql/types.h"
+#include "yxmysql/exception.h"
 #include <mysql/mysql.h>
 #include <memory>
 #include <string>

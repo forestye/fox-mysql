@@ -1,5 +1,5 @@
-#include "yx/mysql/exception.h"
-#include "yx/mysql/types.h"
+#include "yxmysql/exception.h"
+#include "yxmysql/types.h"
 
 int main() {
     try {

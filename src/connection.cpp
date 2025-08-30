@@ -1,5 +1,5 @@
-#include "yx/mysql/connection.h"
-#include "yx/mysql/result_set.h"
+#include "yxmysql/connection.h"
+#include "yxmysql/result_set.h"
 #include <cstring>
 
 namespace yxmysql {
