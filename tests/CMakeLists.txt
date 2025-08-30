@@ -1,0 +1,2 @@
+add_executable(compile_test compile_test.cpp)
+target_link_libraries(compile_test yxmysql)
