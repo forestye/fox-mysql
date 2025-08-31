@@ -9,6 +9,7 @@
 - **类型安全**：提供类型安全的数据访问接口
 - **现代 C++**：使用 C++17 特性，包括 `std::optional`、`std::string_view` 等
 - **高性能**：避免不必要的字符串拷贝，提供高效的数据访问
+- **连接池支持**：线程安全的连接池，支持弹性伸缩和健康检查
 - **易于使用**：简洁的 API 设计
 
 ## 安装依赖
@@ -99,6 +100,33 @@ std::string user_input = "O'Reilly";
 std::string escaped = conn.escape_string(user_input);
 std::string sql = "INSERT INTO users (name) VALUES ('" + escaped + "')";
 conn.execute(sql);
+```
+
+### 6. 连接池使用
+
+```cpp
+#include "yxmysql/pool.h"
+
+// 配置连接池
+yxmysql_pool::PoolOptions pool_opts;
+pool_opts.min_size = 2;
+pool_opts.max_size = 16;
+pool_opts.acquire_timeout = std::chrono::seconds(5);
+
+yxmysql_pool::ConnectionPool pool(config, pool_opts);
+
+// 使用连接池
+{
+    auto conn = pool.acquire();  // 自动获取连接
+    conn->execute("INSERT INTO users (name) VALUES ('Pool User')");
+    
+    auto result = conn->query("SELECT COUNT(*) FROM users");
+    result->next();
+    int count = result->get_int32(0);
+    std::cout << "Total users: " << count << std::endl;
+    
+    // 连接在作用域结束时自动归还给连接池
+}
 ```
 
 ## 配置选项
