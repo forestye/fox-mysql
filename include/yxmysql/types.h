@@ -17,6 +17,7 @@ struct ConnectionConfig {
     std::chrono::seconds write_timeout{30};
     bool auto_reconnect = true;
     bool multi_statements = false;
+    size_t stmt_cache_capacity = 32;
     
     ConnectionConfig() = default;
     

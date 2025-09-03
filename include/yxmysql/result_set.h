@@ -15,6 +15,7 @@ namespace yxmysql {
 class ResultSet {
 public:
     explicit ResultSet(MYSQL_RES* result);
+    explicit ResultSet(MYSQL_STMT* stmt);
     ~ResultSet();
 
     ResultSet(const ResultSet&) = delete;
@@ -53,12 +54,28 @@ private:
     const char* get_field_value(int column_index) const;
     unsigned long get_field_length(int column_index) const;
     
+    // 预编译语句相关方法
+    void init_stmt_binds();
+    void fetch_stmt_row();
+    
+    // 传统结果集成员
     std::unique_ptr<MYSQL_RES, decltype(&mysql_free_result)> result_;
     MYSQL_ROW current_row_;
     unsigned long* field_lengths_;
+    
+    // 预编译语句成员
+    MYSQL_STMT* stmt_;
+    std::vector<MYSQL_BIND> result_binds_;
+    std::vector<std::string> string_buffers_;
+    std::vector<unsigned long> lengths_;
+    std::vector<char> is_nulls_;
+    std::vector<char> errors_;
+    
+    // 共用成员
     MYSQL_FIELD* fields_;
     unsigned int field_count_;
     bool has_current_row_;
+    bool is_stmt_result_;
 };
 
 }  // namespace yxmysql
