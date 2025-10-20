@@ -3,6 +3,7 @@
 #include "yxmysql/connection.h"
 #include "yxmysql/result_set.h"
 #include <cstring>
+#include <type_traits>
 
 namespace yxmysql {
 
@@ -245,7 +246,17 @@ void Connection::prepare_and_bind_params(MYSQL_STMT* stmt, Args&&... params) {
         std::memset(param_binds_.data(), 0, sizeof(MYSQL_BIND) * param_count);
 
         size_t index = 0;
-        (bind_param(param_binds_[index++], std::forward<Args>(params), param_string_buffers_), ...);
+        // 对于字符串字面量（数组），先转换为const char*再绑定
+        ([&] {
+            if constexpr (std::is_array_v<typename std::remove_reference<Args>::type> &&
+                         std::is_same_v<typename std::remove_extent<typename std::remove_reference<Args>::type>::type, const char>) {
+                // 字符串字面量：转换为const char*
+                bind_param(param_binds_[index++], static_cast<const char*>(params), param_string_buffers_);
+            } else {
+                // 其他类型：正常转发
+                bind_param(param_binds_[index++], std::forward<Args>(params), param_string_buffers_);
+            }
+        }(), ...);
 
         bind_parameters(stmt, param_binds_);
     }
