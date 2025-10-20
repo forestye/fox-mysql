@@ -228,25 +228,26 @@ inline void Connection::bind_param<std::nullptr_t>(MYSQL_BIND& bind, std::nullpt
 template<typename... Args>
 void Connection::prepare_and_bind_params(MYSQL_STMT* stmt, Args&&... params) {
     constexpr size_t param_count = sizeof...(params);
-    
+
     if (param_count != mysql_stmt_param_count(stmt)) {
-        throw SQLException("Parameter count mismatch: expected " + 
-            std::to_string(mysql_stmt_param_count(stmt)) + 
+        throw SQLException("Parameter count mismatch: expected " +
+            std::to_string(mysql_stmt_param_count(stmt)) +
             ", got " + std::to_string(param_count));
     }
-    
+
     if constexpr (param_count > 0) {
-        std::vector<MYSQL_BIND> binds(param_count);
-        std::vector<std::string> string_buffers;
-        string_buffers.reserve(param_count); // 预留空间
-        
+        // 使用成员变量而不是局部变量，以保持字符串生命周期
+        param_binds_.resize(param_count);
+        param_string_buffers_.clear();
+        param_string_buffers_.reserve(param_count); // 预留空间
+
         // 清零MYSQL_BIND结构
-        std::memset(binds.data(), 0, sizeof(MYSQL_BIND) * param_count);
-        
+        std::memset(param_binds_.data(), 0, sizeof(MYSQL_BIND) * param_count);
+
         size_t index = 0;
-        (bind_param(binds[index++], std::forward<Args>(params), string_buffers), ...);
-        
-        bind_parameters(stmt, binds);
+        (bind_param(param_binds_[index++], std::forward<Args>(params), param_string_buffers_), ...);
+
+        bind_parameters(stmt, param_binds_);
     }
 }
 

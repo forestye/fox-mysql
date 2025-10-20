@@ -72,7 +72,8 @@ private:
     std::vector<char> errors_;
     
     // 共用成员
-    MYSQL_FIELD* fields_;
+    MYSQL_FIELD* fields_;  // 指向result_中的fields或stmt_fields_的首元素
+    std::vector<MYSQL_FIELD> stmt_fields_;  // 预编译语句的字段信息副本
     unsigned int field_count_;
     bool has_current_row_;
     bool is_stmt_result_;

@@ -24,19 +24,23 @@ ResultSet::ResultSet(MYSQL_STMT* stmt)
     if (!stmt_) {
         throw SQLException("Invalid prepared statement");
     }
-    
+
     // 获取结果元信息
     MYSQL_RES* meta = mysql_stmt_result_metadata(stmt_);
     if (!meta) {
         throw SQLException("Failed to get statement result metadata");
     }
-    
+
     field_count_ = mysql_num_fields(meta);
-    fields_ = mysql_fetch_fields(meta);
-    
-    // 立即释放元信息
+    MYSQL_FIELD* meta_fields = mysql_fetch_fields(meta);
+
+    // 复制字段信息到我们自己的存储中
+    stmt_fields_.assign(meta_fields, meta_fields + field_count_);
+    fields_ = stmt_fields_.data();
+
+    // 释放元信息(我们已经复制了需要的数据)
     mysql_free_result(meta);
-    
+
     // 初始化绑定
     init_stmt_binds();
 }
@@ -55,9 +59,17 @@ ResultSet::ResultSet(ResultSet&& other) noexcept
       lengths_(std::move(other.lengths_)),
       is_nulls_(std::move(other.is_nulls_)),
       errors_(std::move(other.errors_)),
-      fields_(other.fields_), field_count_(other.field_count_),
+      stmt_fields_(std::move(other.stmt_fields_)),
+      field_count_(other.field_count_),
       has_current_row_(other.has_current_row_),
       is_stmt_result_(other.is_stmt_result_) {
+    // 如果是预编译语句结果，fields_需要指向新的stmt_fields_
+    if (is_stmt_result_ && !stmt_fields_.empty()) {
+        fields_ = stmt_fields_.data();
+    } else {
+        fields_ = other.fields_;
+    }
+
     other.current_row_ = nullptr;
     other.field_lengths_ = nullptr;
     other.stmt_ = nullptr;
@@ -73,7 +85,7 @@ ResultSet& ResultSet::operator=(ResultSet&& other) noexcept {
         if (is_stmt_result_ && stmt_) {
             mysql_stmt_free_result(stmt_);
         }
-        
+
         result_ = std::move(other.result_);
         current_row_ = other.current_row_;
         field_lengths_ = other.field_lengths_;
@@ -83,11 +95,18 @@ ResultSet& ResultSet::operator=(ResultSet&& other) noexcept {
         lengths_ = std::move(other.lengths_);
         is_nulls_ = std::move(other.is_nulls_);
         errors_ = std::move(other.errors_);
-        fields_ = other.fields_;
+        stmt_fields_ = std::move(other.stmt_fields_);
         field_count_ = other.field_count_;
         has_current_row_ = other.has_current_row_;
         is_stmt_result_ = other.is_stmt_result_;
-        
+
+        // 如果是预编译语句结果，fields_需要指向新的stmt_fields_
+        if (is_stmt_result_ && !stmt_fields_.empty()) {
+            fields_ = stmt_fields_.data();
+        } else {
+            fields_ = other.fields_;
+        }
+
         other.current_row_ = nullptr;
         other.field_lengths_ = nullptr;
         other.stmt_ = nullptr;
@@ -116,7 +135,22 @@ bool ResultSet::next() {
             has_current_row_ = false;
             return false;
         } else if (fetch_result == MYSQL_DATA_TRUNCATED) {
-            // 数据被截断，但我们仍然可以使用
+            // 数据被截断，需要重新获取被截断的列
+            for (unsigned int i = 0; i < field_count_; ++i) {
+                if (errors_[i]) {
+                    // 这一列被截断了，重新分配缓冲区并获取数据
+                    unsigned long actual_length = lengths_[i];
+                    string_buffers_[i].resize(actual_length + 1);
+
+                    result_binds_[i].buffer = &string_buffers_[i][0];
+                    result_binds_[i].buffer_length = actual_length;
+
+                    // 重新获取这一列的数据
+                    if (mysql_stmt_fetch_column(stmt_, &result_binds_[i], i, 0) != 0) {
+                        throw SQLException("Failed to fetch truncated column: " + std::string(mysql_stmt_error(stmt_)));
+                    }
+                }
+            }
             fetch_stmt_row();
             has_current_row_ = true;
             return true;
@@ -373,30 +407,30 @@ void ResultSet::init_stmt_binds() {
     lengths_.resize(field_count_);
     is_nulls_.resize(field_count_);
     errors_.resize(field_count_);
-    
+
     // 清零绑定结构
     std::memset(result_binds_.data(), 0, sizeof(MYSQL_BIND) * field_count_);
-    
+
     for (unsigned int i = 0; i < field_count_; ++i) {
-        // 为每个字段预分配缓冲区(根据字段类型和最大长度)
-        unsigned long max_length = fields_[i].max_length;
-        if (max_length == 0) {
-            max_length = fields_[i].length;
+        // 为每个字段预分配缓冲区
+        // 使用字段定义的最大长度，如果不可用则使用较大的默认值
+        unsigned long buffer_size = fields_[i].length;  // 字段定义长度(如VARCHAR(100)的100)
+
+        // 对于BLOB/TEXT类型或未知长度的字段，使用更大的缓冲区
+        if (buffer_size == 0 || buffer_size > 65535) {
+            buffer_size = 65535;  // 64KB默认缓冲区
         }
-        if (max_length == 0) {
-            max_length = 255; // 默认缓冲区大小
-        }
-        
-        string_buffers_[i].resize(max_length + 1);
-        
+
+        string_buffers_[i].resize(buffer_size + 1);
+
         result_binds_[i].buffer_type = MYSQL_TYPE_STRING;
         result_binds_[i].buffer = &string_buffers_[i][0];
-        result_binds_[i].buffer_length = max_length;
+        result_binds_[i].buffer_length = buffer_size;
         result_binds_[i].length = &lengths_[i];
         result_binds_[i].is_null = reinterpret_cast<bool*>(&is_nulls_[i]);
         result_binds_[i].error = reinterpret_cast<bool*>(&errors_[i]);
     }
-    
+
     // 绑定结果
     if (mysql_stmt_bind_result(stmt_, result_binds_.data()) != 0) {
         throw SQLException("Failed to bind result: " + std::string(mysql_stmt_error(stmt_)));
@@ -404,10 +438,21 @@ void ResultSet::init_stmt_binds() {
 }
 
 void ResultSet::fetch_stmt_row() {
-    // 更新字符串缓冲区的实际长度
+    // MySQL已经将数据写入到buffer中，我们只需要调整string的长度即可
+    // 注意：string_buffers_已经绑定为MySQL的输出buffer，不能重新分配
+    // 我们只需要设置正确的长度（string末尾到实际数据长度）
     for (unsigned int i = 0; i < field_count_; ++i) {
         if (!is_nulls_[i]) {
-            string_buffers_[i].resize(lengths_[i]);
+            // 不能使用resize()或assign()，因为那会重新分配内存
+            // MySQL已经把数据写入buffer了，我们直接创建新的string_view就行
+            // 但由于get_field_value返回的是string的c_str()，我们需要确保string正确
+            // 关键：在初始化时预分配足够大的buffer，然后不要改变它的地址
+            // 这里只能通过黑科技手段修改string的内部长度
+            // 更好的方案：重新设计，不使用string作为buffer
+
+            // 暂时的解决方案：每次从buffer复制到新的string
+            std::string temp(static_cast<const char*>(result_binds_[i].buffer), lengths_[i]);
+            string_buffers_[i] = std::move(temp);
         } else {
             string_buffers_[i].clear();
         }

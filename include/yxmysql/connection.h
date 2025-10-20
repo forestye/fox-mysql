@@ -87,6 +87,10 @@ private:
     // 预编译语句缓存(FIFO)
     std::deque<std::pair<std::string, PreparedStmtInfo>> stmt_cache_;
     std::string current_database_;
+
+    // 参数绑定缓冲区(用于保持字符串生命周期)
+    std::vector<MYSQL_BIND> param_binds_;
+    std::vector<std::string> param_string_buffers_;
 };
 
 }  // namespace yxmysql
