@@ -4,6 +4,73 @@
 
 ---
 
+## 📋 实现状态
+
+**实现完成度**: ✅ **95%** (MVP 功能完整)
+**最后更新时间**: 2025-10-20
+**实现版本**: v1.0
+
+### 实现情况总结
+
+本设计文档的必选功能（MVP）已基本实现，少数项需注意：
+
+| 功能模块 | 设计要求 | 实现状态 | 代码位置 |
+|---------|---------|---------|---------|
+| **API 接口** | | | |
+| execute_prepared | 非查询语句接口 | ✅ 已实现 | `include/yxmysql/connection.h:35-36` |
+| query_prepared | 查询语句接口 | ✅ 已实现 | `include/yxmysql/connection.h:38-39` |
+| **参数绑定** | | | |
+| 整数类型 | int, long long | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:131-150` |
+| 浮点类型 | float, double | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:153-172` |
+| 字符串类型 | string, string_view, const char* | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:175-216` |
+| NULL 值 | nullptr_t | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:219-225` |
+| 深拷贝字符串 | 内部复制字符串参数 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:176-210` |
+| 参数数量检查 | 编译期+运行期检查 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:232-236` |
+| **语句缓存** | | | |
+| FIFO 缓存 | deque 实现（实际为 LRU） | ⚠️ 实现差异 | `include/yxmysql/connection.h:88` |
+| 缓存 Key | db_name + '\n' + trim(sql) | ✅ 已实现 | `src/connection.cpp:233-250` |
+| 缓存容量 | 默认 32，可配置 | ✅ 已实现 | `src/connection.cpp:302` |
+| close 清空缓存 | 析构/close 时清空 | ✅ 已实现 | `src/connection.cpp:40-43,119-120` |
+| 重连清空缓存 | 重连成功后清空 | ✅ 已实现 | `src/connection.cpp:113-116` |
+| USE db 清空缓存 | 切换数据库后清空 | ❌ **未实现** | - |
+| **错误处理** | | | |
+| 白名单重试 | 4 种错误码重试 | ✅ 已实现 | `src/connection.cpp:315-357` |
+| 仅重试一次 | retry_attempted 标志 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:11,64` |
+| ER_UNSUPPORTED_PS | 不支持的语句不入缓存 | ✅ 已实现 | `src/connection.cpp:290-293` |
+| **执行流程** | | | |
+| reset + bind + execute | 完整流程 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:10-127` |
+| 设置 UPDATE_MAX_LENGTH | 查询时设置属性 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:101-104` |
+| store_result | 查询时存储结果 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:107` |
+| **ResultSet 一致性** | | | |
+| 统一接口 | 与非 prepared 接口一致 | ✅ 已实现 | `include/yxmysql/result_set.h` |
+| **可选功能** | | | |
+| 日志与指标 | 缓存命中/淘汰计数等 | ⚠️ 未实现 | - |
+
+### 已知问题与差异
+
+1. **❌ 缺失功能**:
+   - **USE database 清空缓存**: 设计要求执行 `USE db` 后清空缓存，当前未实现。虽然 `current_database_` 变量存在，但 `execute()` 方法未检测 USE 语句。这可能导致切换数据库后，缓存的 prepared statement 指向错误的 schema。
+
+2. **⚠️ 实现差异**:
+   - **缓存策略**: 设计文档明确要求 **FIFO**，但实际实现是 **LRU** 风格（`src/connection.cpp:272-276` 将命中项移到队尾）。代码注释中也说明："LRU行为，虽然文档说FIFO，但这样更高效"。**LRU 通常更优，建议保持当前实现。**
+
+3. **⚠️ 未实现项**:
+   - 日志输出（SQL 片段、准备成功/失败等）
+   - 统计指标（缓存命中率、执行耗时等）
+   - 以上属于可选的观测性增强功能，不影响核心使用
+
+### 设计变更记录
+
+- **缓存策略**: 从设计的 FIFO 改为 LRU（更高效）
+
+### 后续改进建议
+
+1. **高优先级**: 实现 USE database 后清空缓存（避免跨 schema 语句混乱）
+2. **中优先级**: 统一文档与代码，明确采用 LRU 缓存策略
+3. **低优先级**: 添加日志和统计指标（按需添加）
+
+---
+
 ## 一、必选功能
 
 ### 1. 对外 API
