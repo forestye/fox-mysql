@@ -246,14 +246,30 @@ void Connection::prepare_and_bind_params(MYSQL_STMT* stmt, Args&&... params) {
         std::memset(param_binds_.data(), 0, sizeof(MYSQL_BIND) * param_count);
 
         size_t index = 0;
-        // 对于字符串字面量（数组），先转换为const char*再绑定
+        // 对参数进行类型转换，使其能匹配现有的bind_param特化
         ([&] {
+            using PlainType = typename std::remove_cv<typename std::remove_reference<Args>::type>::type;
+
+            // 1. 检测字符串字面量（数组）- 优先处理
             if constexpr (std::is_array_v<typename std::remove_reference<Args>::type> &&
                          std::is_same_v<typename std::remove_extent<typename std::remove_reference<Args>::type>::type, const char>) {
                 // 字符串字面量：转换为const char*
                 bind_param(param_binds_[index++], static_cast<const char*>(params), param_string_buffers_);
-            } else {
-                // 其他类型：正常转发
+            }
+            // 2. 检测std::string的左值引用
+            else if constexpr (std::is_same_v<PlainType, std::string> && std::is_lvalue_reference_v<Args>) {
+                // 左值string（包括const和非const）：转换为string_view
+                bind_param(param_binds_[index++], std::string_view(params), param_string_buffers_);
+            }
+            // 3. 检测其他类型的非const左值引用
+            else if constexpr (std::is_lvalue_reference_v<Args> &&
+                              !std::is_const_v<typename std::remove_reference<Args>::type>) {
+                // 非const左值引用：去除引用后传递（会被当作右值）
+                // 对于基础类型(int, double等)，这会复制值
+                bind_param(param_binds_[index++], static_cast<PlainType>(params), param_string_buffers_);
+            }
+            // 4. 其他类型：正常转发
+            else {
                 bind_param(param_binds_[index++], std::forward<Args>(params), param_string_buffers_);
             }
         }(), ...);
