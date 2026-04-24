@@ -1,5 +1,5 @@
-#include "yxmysql/connection.h"
-#include "yxmysql/result_set.h"
+#include "fox-mysql/connection.h"
+#include "fox-mysql/result_set.h"
 #include <cstring>
 #include <algorithm>
 #include <cctype>
@@ -25,7 +25,7 @@
 #define ER_NEED_REPREPARE 1615
 #endif
 
-namespace yxmysql {
+namespace fox::mysql {
 
 Connection::Connection(const ConnectionConfig& config)
     : config_(config), mysql_(nullptr), connected_(false), current_database_(config.database) {
@@ -368,4 +368,4 @@ void Connection::bind_parameters(MYSQL_STMT* stmt, std::vector<MYSQL_BIND>& bind
 
 // All template implementations moved to connection_prepared.hpp
 
-}  // namespace yxmysql
+}  // namespace fox::mysql

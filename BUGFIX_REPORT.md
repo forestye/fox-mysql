@@ -16,7 +16,7 @@
 
 ### 🔴 Bug #1: 参数绑定字符串生命周期问题 (严重 - 内存安全)
 
-**位置**: `include/yxmysql/connection_prepared.hpp:prepare_and_bind_params()`
+**位置**: `include/fox-mysql/connection_prepared.hpp:prepare_and_bind_params()`
 
 **问题描述**:
 ```cpp
@@ -63,8 +63,8 @@ void Connection::prepare_and_bind_params(MYSQL_STMT* stmt, Args&&... params) {
 ```
 
 **影响文件**:
-- `include/yxmysql/connection.h` - 添加成员变量
-- `include/yxmysql/connection_prepared.hpp` - 修改bind函数
+- `include/fox-mysql/connection.h` - 添加成员变量
+- `include/fox-mysql/connection_prepared.hpp` - 修改bind函数
 
 **测试结果**: ✅ INSERT操作不再报错
 
@@ -122,7 +122,7 @@ ResultSet::ResultSet(MYSQL_STMT* stmt) {
 ```
 
 **影响文件**:
-- `include/yxmysql/result_set.h` - 添加`stmt_fields_`成员
+- `include/fox-mysql/result_set.h` - 添加`stmt_fields_`成员
 - `src/result_set.cpp` - 修改构造函数和移动操作
 
 **测试结果**: ✅ 缓冲区大小正确分配
@@ -214,7 +214,7 @@ void ResultSet::fetch_stmt_row() {
 ```
 
 **影响文件**:
-- `include/yxmysql/result_set.h` - 重新设计buffer管理
+- `include/fox-mysql/result_set.h` - 重新设计buffer管理
 - `src/result_set.cpp` - 重写init_stmt_binds和fetch_stmt_row
 
 **测试结果**:
@@ -226,7 +226,7 @@ void ResultSet::fetch_stmt_row() {
 ## 测试环境
 
 ### 测试程序
-文件: `/home/yelin/code/yxmysql/test_prepared_debug.cpp`
+文件: `/home/yelin/code/fox-mysql/test_prepared_debug.cpp`
 
 ```cpp
 // 创建表并插入不同长度的字符串
@@ -249,13 +249,13 @@ mysql -u test -ptest test -e "SELECT id, name, LENGTH(name) as len FROM debug_te
 ## 修复文件清单
 
 ### ✅ 已修复
-1. `include/yxmysql/connection.h` - 添加参数绑定缓冲区成员变量
-2. `include/yxmysql/connection_prepared.hpp` - 修改参数绑定逻辑
-3. `include/yxmysql/result_set.h` - 添加字段信息副本存储
+1. `include/fox-mysql/connection.h` - 添加参数绑定缓冲区成员变量
+2. `include/fox-mysql/connection_prepared.hpp` - 修改参数绑定逻辑
+3. `include/fox-mysql/result_set.h` - 添加字段信息副本存储
 4. `src/result_set.cpp` - 修复构造函数、移动操作、fetch逻辑
 
 ### ⚠️ 待完成
-1. `include/yxmysql/result_set.h` - 重新设计buffer管理（使用vector<char>）
+1. `include/fox-mysql/result_set.h` - 重新设计buffer管理（使用vector<char>）
 2. `src/result_set.cpp` - 完整重构buffer管理代码
 
 ---
@@ -359,10 +359,10 @@ const char* get_field_value(int column_index) const {
 
 ## 相关文件位置
 
-- 测试程序: `/home/yelin/code/yxmysql/test_prepared_debug.cpp`
-- 主要头文件: `/home/yelin/code/yxmysql/include/yxmysql/`
-- 实现文件: `/home/yelin/code/yxmysql/src/`
-- 构建目录: `/home/yelin/code/yxmysql/build/`
+- 测试程序: `/home/yelin/code/fox-mysql/test_prepared_debug.cpp`
+- 主要头文件: `/home/yelin/code/fox-mysql/include/fox-mysql/`
+- 实现文件: `/home/yelin/code/fox-mysql/src/`
+- 构建目录: `/home/yelin/code/fox-mysql/build/`
 
 ---
 
@@ -377,7 +377,7 @@ make -j4
 
 # 编译测试程序
 cd ..
-g++ -std=c++17 -I ./include ./test_prepared_debug.cpp -L./build -lyxmysql -lmysqlclient -o ./test_prepared_debug
+g++ -std=c++17 -I ./include ./test_prepared_debug.cpp -L./build -lfox-mysql -lmysqlclient -o ./test_prepared_debug
 
 # 运行测试
 export LD_LIBRARY_PATH=./build

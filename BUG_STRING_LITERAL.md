@@ -11,19 +11,19 @@
 ### 用户看到的错误
 
 ```bash
-undefined reference to `void yxmysql::Connection::bind_param<char const (&) [N]>(
+undefined reference to `void fox::mysql::Connection::bind_param<char const (&) [N]>(
     MYSQL_BIND&, char const (&) [N], std::vector<std::string>&)'
 ```
 
 或者在某些编译器/环境下可能显示为：
 ```
-'class yxmysql::Connection' has no member named 'query_prepared'
+'class fox::mysql::Connection' has no member named 'query_prepared'
 ```
 
 ### 失败的代码示例
 
 ```cpp
-#include "yxmysql/pool.h"
+#include "fox-mysql/pool.h"
 
 auto conn = pool.acquire();
 
@@ -32,7 +32,7 @@ conn->query_prepared("SELECT * FROM users WHERE name = ?", "Alice");
 //                                                           ^^^^^^^ 字符串字面量
 
 // 或通过ref()
-yxmysql::Connection& ref = conn.ref();
+fox::mysql::Connection& ref = conn.ref();
 ref.query_prepared("SELECT * FROM users WHERE id = ?", 123, "test");
 //                                                           ^^^^^^ 字符串字面量
 ```
@@ -67,7 +67,7 @@ ref.query_prepared("SELECT * FROM users WHERE id = ?", 123, "test");
 
 在 `prepare_and_bind_params()` 中添加类型检测，对字符串字面量（数组类型）进行特殊处理：
 
-**文件**: `include/yxmysql/connection_prepared.hpp`
+**文件**: `include/fox-mysql/connection_prepared.hpp`
 
 ```cpp
 template<typename... Args>
@@ -132,7 +132,7 @@ String literals now work correctly with prepared statements!
 ## 相关文件
 
 - **修改的文件**：
-  - `include/yxmysql/connection_prepared.hpp` - 添加字符串字面量处理逻辑
+  - `include/fox-mysql/connection_prepared.hpp` - 添加字符串字面量处理逻辑
 
 - **测试文件**：
   - `test_string_literal_fix.cpp` - 验证修复的测试

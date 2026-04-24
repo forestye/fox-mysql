@@ -1,15 +1,15 @@
-#include "yxmysql/pool.h"
+#include "fox-mysql/pool.h"
 #include <algorithm>
 #include <stdexcept>
 #include <thread>
 
-namespace yxmysql_pool {
+namespace fox::mysql::pool {
 
 // ============================================================================
 // PooledConn Implementation
 // ============================================================================
 
-PooledConn::PooledConn(std::unique_ptr<yxmysql::Connection> conn, ConnectionPool* pool)
+PooledConn::PooledConn(std::unique_ptr<fox::mysql::Connection> conn, ConnectionPool* pool)
     : conn_(std::move(conn)), pool_(pool) {}
 
 PooledConn::PooledConn(PooledConn&& other) noexcept
@@ -31,11 +31,11 @@ PooledConn::~PooledConn() {
     reset();
 }
 
-yxmysql::Connection* PooledConn::operator->() const noexcept {
+fox::mysql::Connection* PooledConn::operator->() const noexcept {
     return conn_.get();
 }
 
-yxmysql::Connection& PooledConn::ref() const {
+fox::mysql::Connection& PooledConn::ref() const {
     if (!conn_) {
         throw std::runtime_error("PooledConn: No connection available");
     }
@@ -53,7 +53,7 @@ void PooledConn::reset() {
 // ConnectionPool Implementation
 // ============================================================================
 
-ConnectionPool::ConnectionPool(const yxmysql::ConnectionConfig& config, 
+ConnectionPool::ConnectionPool(const fox::mysql::ConnectionConfig& config, 
                              const PoolOptions& options)
     : config_(config), options_(options) {
     
@@ -94,13 +94,13 @@ void ConnectionPool::warm_up_pool() {
     }
 }
 
-std::unique_ptr<yxmysql::Connection> ConnectionPool::create_connection() {
-    auto conn = std::make_unique<yxmysql::Connection>(config_);
+std::unique_ptr<fox::mysql::Connection> ConnectionPool::create_connection() {
+    auto conn = std::make_unique<fox::mysql::Connection>(config_);
     conn->connect();
     return conn;
 }
 
-bool ConnectionPool::health_check_connection(yxmysql::Connection* conn) {
+bool ConnectionPool::health_check_connection(fox::mysql::Connection* conn) {
     if (!conn || !conn->is_connected()) {
         return false;
     }
@@ -108,7 +108,7 @@ bool ConnectionPool::health_check_connection(yxmysql::Connection* conn) {
     try {
         conn->ping();
         return true;
-    } catch (const yxmysql::ConnectionException&) {
+    } catch (const fox::mysql::ConnectionException&) {
         reconnect_attempts_++;
         
         try {
@@ -203,7 +203,7 @@ PooledConn ConnectionPool::acquire(std::chrono::milliseconds timeout) {
                 return PooledConn(std::move(conn), this);
             } catch (const std::exception& e) {
                 total_connections_--;  // Rollback the increment
-                throw yxmysql::ConnectionException("Failed to create new connection: " + std::string(e.what()));
+                throw fox::mysql::ConnectionException("Failed to create new connection: " + std::string(e.what()));
             }
         }
         
@@ -218,7 +218,7 @@ PooledConn ConnectionPool::acquire(std::chrono::milliseconds timeout) {
     }
 }
 
-void ConnectionPool::release_connection(std::unique_ptr<yxmysql::Connection> conn) {
+void ConnectionPool::release_connection(std::unique_ptr<fox::mysql::Connection> conn) {
     if (!conn) {
         return;
     }
@@ -237,10 +237,10 @@ void ConnectionPool::release_connection(std::unique_ptr<yxmysql::Connection> con
     if (options_.rollback_on_return) {
         try {
             conn->rollback();
-        } catch (const yxmysql::ConnectionException&) {
+        } catch (const fox::mysql::ConnectionException&) {
             // Connection-level error, destroy the connection
             should_destroy = true;
-        } catch (const yxmysql::QueryException&) {
+        } catch (const fox::mysql::QueryException&) {
             // Query error during rollback, try ping to check connection health
             try {
                 conn->ping();
@@ -276,4 +276,4 @@ size_t ConnectionPool::idle_count() const {
     return idle_connections_.size();
 }
 
-} // namespace yxmysql_pool
+} // namespace fox::mysql::pool

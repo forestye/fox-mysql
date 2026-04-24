@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace yxmysql {
+namespace fox::mysql {
 
 class SQLException : public std::runtime_error {
 public:
@@ -46,4 +46,4 @@ public:
         : SQLException(std::string("Type conversion error: ") + message) {}
 };
 
-}  // namespace yxmysql
+}  // namespace fox::mysql

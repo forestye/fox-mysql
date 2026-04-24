@@ -1,9 +1,9 @@
-#include "yxmysql/result_set.h"
+#include "fox-mysql/result_set.h"
 #include <cstring>
 #include <cstdlib>
 #include <limits>
 
-namespace yxmysql {
+namespace fox::mysql {
 
 ResultSet::ResultSet(MYSQL_RES* result)
     : result_(result, mysql_free_result), current_row_(nullptr), 
@@ -459,4 +459,4 @@ void ResultSet::fetch_stmt_row() {
     }
 }
 
-}  // namespace yxmysql
+}  // namespace fox::mysql

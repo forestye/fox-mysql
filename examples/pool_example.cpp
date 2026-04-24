@@ -1,5 +1,5 @@
-#include "yxmysql/yxmysql.h"
-#include "yxmysql/pool.h"
+#include "fox-mysql/fox-mysql.h"
+#include "fox-mysql/pool.h"
 #include <iostream>
 #include <thread>
 #include <vector>
@@ -8,14 +8,14 @@
 int main() {
     try {
         // Configure connection
-        yxmysql::ConnectionConfig config;
+        fox::mysql::ConnectionConfig config;
         config.host = "localhost";
         config.user = "test_user";
         config.password = "test_password";
         config.database = "test_db";
         
         // Configure pool options
-        yxmysql_pool::PoolOptions pool_opts;
+        fox::mysql::pool::PoolOptions pool_opts;
         pool_opts.min_size = 2;
         pool_opts.max_size = 8;
         pool_opts.acquire_timeout = std::chrono::seconds(5);
@@ -24,7 +24,7 @@ int main() {
         pool_opts.rollback_on_return = true;
         
         // Create connection pool
-        yxmysql_pool::ConnectionPool pool(config, pool_opts);
+        fox::mysql::pool::ConnectionPool pool(config, pool_opts);
         
         std::cout << "Connection pool created successfully!" << std::endl;
         std::cout << "Pool size: " << pool.size() << std::endl;
@@ -123,10 +123,10 @@ int main() {
         
         std::cout << "\nAll tests completed successfully!" << std::endl;
         
-    } catch (const yxmysql_pool::PoolException& e) {
+    } catch (const fox::mysql::pool::PoolException& e) {
         std::cerr << "Pool error: " << e.what() << std::endl;
         return 1;
-    } catch (const yxmysql::SQLException& e) {
+    } catch (const fox::mysql::SQLException& e) {
         std::cerr << "Database error: " << e.what() << " (Code: " << e.error_code() << ")" << std::endl;
         return 1;
     } catch (const std::exception& e) {

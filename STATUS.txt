@@ -56,9 +56,9 @@ Bug #3: ResultSet数据获取buffer管理 [临时修复]
 ========================================
 
 核心修复:
-  include/yxmysql/connection.h
-  include/yxmysql/connection_prepared.hpp
-  include/yxmysql/result_set.h
+  include/fox-mysql/connection.h
+  include/fox-mysql/connection_prepared.hpp
+  include/fox-mysql/result_set.h
   src/result_set.cpp
 
 文档:
@@ -174,7 +174,7 @@ Bug报告:
 ========================================
 
 # 测试所有修复
-cd /home/yelin/code/yxmysql/build
+cd /home/yelin/code/fox-mysql/build
 ./prepared_test
 
 # 查看提交历史

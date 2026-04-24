@@ -150,9 +150,9 @@ conn->execute_prepared(
 ## 影响的文件
 
 ### 修改的核心文件
-- `include/yxmysql/connection.h` - 添加成员变量
-- `include/yxmysql/connection_prepared.hpp` - 参数绑定逻辑
-- `include/yxmysql/result_set.h` - 字段信息存储
+- `include/fox-mysql/connection.h` - 添加成员变量
+- `include/fox-mysql/connection_prepared.hpp` - 参数绑定逻辑
+- `include/fox-mysql/result_set.h` - 字段信息存储
 - `src/result_set.cpp` - ResultSet实现
 
 ### 新增的文档
@@ -254,16 +254,16 @@ a5c6db7 修复预编译SQL功能的关键bug并添加详细测试
 ### 推荐用法
 
 ```cpp
-#include "yxmysql/pool.h"
+#include "fox-mysql/pool.h"
 
 // 1. 创建连接池
-yxmysql::ConnectionConfig config;
+fox::mysql::ConnectionConfig config;
 config.host = "localhost";
 config.user = "root";
 config.password = "password";
 config.database = "mydb";
 
-yxmysql_pool::ConnectionPool pool(config);
+fox::mysql::pool::ConnectionPool pool(config);
 
 // 2. 使用预编译SQL（所有方式都支持！）
 auto conn = pool.acquire();

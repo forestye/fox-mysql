@@ -1,8 +1,8 @@
-#include "yxmysql/yxmysql.h"
+#include "fox-mysql/fox-mysql.h"
 #include <iostream>
 #include <cassert>
 
-using namespace yxmysql;
+using namespace fox::mysql;
 
 void test_basic_prepared_functionality() {
     std::cout << "Testing basic prepared statement functionality..." << std::endl;

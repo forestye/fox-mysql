@@ -17,9 +17,9 @@ git status
 git diff
 
 # 提交
-git add include/yxmysql/connection.h \
-        include/yxmysql/connection_prepared.hpp \
-        include/yxmysql/result_set.h \
+git add include/fox-mysql/connection.h \
+        include/fox-mysql/connection_prepared.hpp \
+        include/fox-mysql/result_set.h \
         src/result_set.cpp
 
 git commit -m "修复预编译SQL的两个严重内存安全bug

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "yxmysql/connection.h"
-#include "yxmysql/types.h"
-#include "yxmysql/exception.h"
+#include "fox-mysql/connection.h"
+#include "fox-mysql/types.h"
+#include "fox-mysql/exception.h"
 #include <memory>
 #include <queue>
 #include <mutex>
@@ -10,7 +10,7 @@
 #include <chrono>
 #include <atomic>
 
-namespace yxmysql_pool {
+namespace fox::mysql::pool {
 
 struct PoolOptions {
     size_t min_size = 2;
@@ -38,8 +38,8 @@ public:
     ~PooledConn();
     
     // Access the underlying connection
-    yxmysql::Connection* operator->() const noexcept;
-    yxmysql::Connection& ref() const;
+    fox::mysql::Connection* operator->() const noexcept;
+    fox::mysql::Connection& ref() const;
     
     // Explicitly return the connection to pool
     void reset();
@@ -50,25 +50,25 @@ public:
 private:
     friend class ConnectionPool;
     
-    PooledConn(std::unique_ptr<yxmysql::Connection> conn, ConnectionPool* pool);
+    PooledConn(std::unique_ptr<fox::mysql::Connection> conn, ConnectionPool* pool);
     
-    std::unique_ptr<yxmysql::Connection> conn_;
+    std::unique_ptr<fox::mysql::Connection> conn_;
     ConnectionPool* pool_;
 };
 
 // Connection wrapper with timestamp for idle management
 struct PoolConnection {
-    std::unique_ptr<yxmysql::Connection> conn;
+    std::unique_ptr<fox::mysql::Connection> conn;
     std::chrono::steady_clock::time_point last_used;
     
-    PoolConnection(std::unique_ptr<yxmysql::Connection> c)
+    PoolConnection(std::unique_ptr<fox::mysql::Connection> c)
         : conn(std::move(c)), last_used(std::chrono::steady_clock::now()) {}
 };
 
 // Main connection pool class
 class ConnectionPool {
 public:
-    explicit ConnectionPool(const yxmysql::ConnectionConfig& config, 
+    explicit ConnectionPool(const fox::mysql::ConnectionConfig& config, 
                            const PoolOptions& options = {});
     ~ConnectionPool();
     
@@ -86,21 +86,21 @@ public:
     size_t idle_count() const;
     
     // Get pool configuration
-    const yxmysql::ConnectionConfig& config() const noexcept { return config_; }
+    const fox::mysql::ConnectionConfig& config() const noexcept { return config_; }
     const PoolOptions& options() const noexcept { return options_; }
 
 private:
     friend class PooledConn;
     
     // Internal methods
-    void release_connection(std::unique_ptr<yxmysql::Connection> conn);
-    std::unique_ptr<yxmysql::Connection> create_connection();
-    bool health_check_connection(yxmysql::Connection* conn);
+    void release_connection(std::unique_ptr<fox::mysql::Connection> conn);
+    std::unique_ptr<fox::mysql::Connection> create_connection();
+    bool health_check_connection(fox::mysql::Connection* conn);
     void cleanup_idle_connections();
     void warm_up_pool();
     
     // Configuration
-    yxmysql::ConnectionConfig config_;
+    fox::mysql::ConnectionConfig config_;
     PoolOptions options_;
     
     // Pool state
@@ -120,7 +120,7 @@ private:
 };
 
 // Pool-specific exceptions
-class PoolException : public yxmysql::SQLException {
+class PoolException : public fox::mysql::SQLException {
 public:
     explicit PoolException(const std::string& message)
         : SQLException("Pool error: " + message) {}
@@ -143,4 +143,4 @@ public:
         : PoolException("Health check failed: " + details) {}
 };
 
-} // namespace yxmysql_pool
+} // namespace fox::mysql::pool

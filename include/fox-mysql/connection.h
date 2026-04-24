@@ -1,7 +1,7 @@
 #pragma once
 
-#include "yxmysql/types.h"
-#include "yxmysql/exception.h"
+#include "fox-mysql/types.h"
+#include "fox-mysql/exception.h"
 #include <mysql/mysql.h>
 #include <memory>
 #include <string>
@@ -9,7 +9,7 @@
 #include <deque>
 #include <vector>
 
-namespace yxmysql {
+namespace fox::mysql {
 
 class ResultSet;
 
@@ -93,6 +93,6 @@ private:
     std::vector<std::string> param_string_buffers_;
 };
 
-}  // namespace yxmysql
+}  // namespace fox::mysql
 
-#include "yxmysql/connection_prepared.hpp"
+#include "fox-mysql/connection_prepared.hpp"

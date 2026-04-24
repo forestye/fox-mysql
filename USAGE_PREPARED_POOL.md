@@ -3,21 +3,21 @@
 ## 快速开始
 
 ```cpp
-#include "yxmysql/pool.h"
+#include "fox-mysql/pool.h"
 
 int main() {
     // 1. 配置连接
-    yxmysql::ConnectionConfig config;
+    fox::mysql::ConnectionConfig config;
     config.host = "localhost";
     config.user = "root";
     config.password = "password";
     config.database = "mydb";
 
     // 2. 创建连接池
-    yxmysql_pool::PoolOptions opts;
+    fox::mysql::pool::PoolOptions opts;
     opts.min_size = 2;
     opts.max_size = 10;
-    yxmysql_pool::ConnectionPool pool(config, opts);
+    fox::mysql::pool::ConnectionPool pool(config, opts);
 
     // 3. 使用预编译SQL
     auto conn = pool.acquire();
@@ -27,7 +27,7 @@ int main() {
                           1, "Alice", "alice@example.com");
 
     // 方法2：通过 ref() 获取引用
-    yxmysql::Connection& ref = conn.ref();
+    fox::mysql::Connection& ref = conn.ref();
     auto result = ref.query_prepared("SELECT * FROM users WHERE id = ?", 1);
 
     return 0;
@@ -175,7 +175,7 @@ for (int i = 0; i < 1000; i++) {
 ### 配置建议
 
 ```cpp
-yxmysql_pool::PoolOptions opts;
+fox::mysql::pool::PoolOptions opts;
 opts.min_size = 5;              // 最小连接数：根据平均负载设置
 opts.max_size = 20;             // 最大连接数：根据峰值负载设置
 opts.acquire_timeout = std::chrono::milliseconds(3000);  // 获取超时
@@ -208,25 +208,25 @@ conn->query_prepared("SELECT ...", params...);  // 连接被占用太久
 ## 错误处理
 
 ```cpp
-#include "yxmysql/exception.h"
+#include "fox-mysql/exception.h"
 
 try {
     auto conn = pool.acquire();
     conn->query_prepared("SELECT * FROM users WHERE id = ?", id);
 
-} catch (const yxmysql_pool::AcquireTimeoutException& e) {
+} catch (const fox::mysql::pool::AcquireTimeoutException& e) {
     // 连接池获取超时
     std::cerr << "Pool timeout: " << e.what() << "\n";
 
-} catch (const yxmysql::QueryException& e) {
+} catch (const fox::mysql::QueryException& e) {
     // SQL查询错误
     std::cerr << "Query error: " << e.what() << "\n";
 
-} catch (const yxmysql::ConnectionException& e) {
+} catch (const fox::mysql::ConnectionException& e) {
     // 连接错误
     std::cerr << "Connection error: " << e.what() << "\n";
 
-} catch (const yxmysql::SQLException& e) {
+} catch (const fox::mysql::SQLException& e) {
     // 其他SQL错误
     std::cerr << "SQL error: " << e.what() << "\n";
 }
@@ -276,7 +276,7 @@ try {
 ## 编译
 
 ```bash
-g++ -std=c++17 -I include your_code.cpp -L build -lyxmysql -lmysqlclient -o your_app
+g++ -std=c++17 -I include your_code.cpp -L build -lfox-mysql -lmysqlclient -o your_app
 ```
 
 ## 参考

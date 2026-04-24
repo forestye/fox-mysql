@@ -1,11 +1,11 @@
 #pragma once
 
-#include "yxmysql/connection.h"
-#include "yxmysql/result_set.h"
+#include "fox-mysql/connection.h"
+#include "fox-mysql/result_set.h"
 #include <cstring>
 #include <type_traits>
 
-namespace yxmysql {
+namespace fox::mysql {
 
 template <typename... Args>
 void Connection::execute_prepared(std::string_view sql, Args&&... params) {
@@ -278,4 +278,4 @@ void Connection::prepare_and_bind_params(MYSQL_STMT* stmt, Args&&... params) {
     }
 }
 
-}  // namespace yxmysql
+}  // namespace fox::mysql

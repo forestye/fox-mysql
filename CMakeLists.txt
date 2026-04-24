@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(yxmysql VERSION 1.0.0 LANGUAGES CXX)
+project(fox-mysql VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -31,17 +31,17 @@ include_directories(include)
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 if(MYSQL_FOUND)
-    add_library(yxmysql ${SOURCES})
-    target_include_directories(yxmysql PUBLIC
+    add_library(fox-mysql ${SOURCES})
+    target_include_directories(fox-mysql PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
         ${MYSQL_INCLUDE_DIRS}
     )
-    target_link_libraries(yxmysql ${MYSQL_LIBRARIES})
+    target_link_libraries(fox-mysql ${MYSQL_LIBRARIES})
 else()
     # Header-only version for testing compilation
-    add_library(yxmysql INTERFACE)
-    target_include_directories(yxmysql INTERFACE
+    add_library(fox-mysql INTERFACE)
+    target_include_directories(fox-mysql INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
     )
@@ -58,8 +58,8 @@ if(BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
-install(TARGETS yxmysql
-    EXPORT yxmysqlTargets
+install(TARGETS fox-mysql
+    EXPORT fox-mysqlTargets
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
@@ -67,27 +67,27 @@ install(TARGETS yxmysql
 
 install(DIRECTORY include/ DESTINATION include)
 
-install(EXPORT yxmysqlTargets
-    FILE yxmysqlTargets.cmake
-    NAMESPACE yx::
-    DESTINATION lib/cmake/yxmysql
+install(EXPORT fox-mysqlTargets
+    FILE fox-mysqlTargets.cmake
+    NAMESPACE fox-mysql::
+    DESTINATION lib/cmake/fox-mysql
 )
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
-    "yxmysqlConfigVersion.cmake"
+    "fox-mysqlConfigVersion.cmake"
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
 
 configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yxmysqlConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/yxmysqlConfig.cmake"
-    INSTALL_DESTINATION lib/cmake/yxmysql
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/fox-mysqlConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/fox-mysqlConfig.cmake"
+    INSTALL_DESTINATION lib/cmake/fox-mysql
 )
 
 install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/yxmysqlConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/yxmysqlConfigVersion.cmake"
-    DESTINATION lib/cmake/yxmysql
+    "${CMAKE_CURRENT_BINARY_DIR}/fox-mysqlConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/fox-mysqlConfigVersion.cmake"
+    DESTINATION lib/cmake/fox-mysql
 )

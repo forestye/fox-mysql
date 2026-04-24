@@ -3,7 +3,7 @@
 #include <chrono>
 #include <string>
 
-namespace yxmysql {
+namespace fox::mysql {
 
 struct ConnectionConfig {
     std::string host = "localhost";
@@ -58,4 +58,4 @@ enum class FieldType {
     GEOMETRY = 255
 };
 
-}  // namespace yxmysql
+}  // namespace fox::mysql

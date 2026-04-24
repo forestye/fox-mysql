@@ -1,4 +1,4 @@
-# yxmysql 预编译 SQL（Prepared）设计文档
+# fox-mysql 预编译 SQL（Prepared）设计文档
 
 > **目标**：在不改变现有用法的前提下，为 `Connection` 增加两条便捷接口与语句缓存（FIFO），覆盖 80% 高频场景，坚持**不过度设计**。本稿分为「必选功能」与「可选功能」两部分，开发团队先实现必选功能，可选功能根据数据驱动逐步演进。
 
@@ -17,17 +17,17 @@
 | 功能模块 | 设计要求 | 实现状态 | 代码位置 |
 |---------|---------|---------|---------|
 | **API 接口** | | | |
-| execute_prepared | 非查询语句接口 | ✅ 已实现 | `include/yxmysql/connection.h:35-36` |
-| query_prepared | 查询语句接口 | ✅ 已实现 | `include/yxmysql/connection.h:38-39` |
+| execute_prepared | 非查询语句接口 | ✅ 已实现 | `include/fox-mysql/connection.h:35-36` |
+| query_prepared | 查询语句接口 | ✅ 已实现 | `include/fox-mysql/connection.h:38-39` |
 | **参数绑定** | | | |
-| 整数类型 | int, long long | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:131-150` |
-| 浮点类型 | float, double | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:153-172` |
-| 字符串类型 | string, string_view, const char* | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:175-216` |
-| NULL 值 | nullptr_t | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:219-225` |
-| 深拷贝字符串 | 内部复制字符串参数 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:176-210` |
-| 参数数量检查 | 编译期+运行期检查 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:232-236` |
+| 整数类型 | int, long long | ✅ 已实现 | `include/fox-mysql/connection_prepared.hpp:131-150` |
+| 浮点类型 | float, double | ✅ 已实现 | `include/fox-mysql/connection_prepared.hpp:153-172` |
+| 字符串类型 | string, string_view, const char* | ✅ 已实现 | `include/fox-mysql/connection_prepared.hpp:175-216` |
+| NULL 值 | nullptr_t | ✅ 已实现 | `include/fox-mysql/connection_prepared.hpp:219-225` |
+| 深拷贝字符串 | 内部复制字符串参数 | ✅ 已实现 | `include/fox-mysql/connection_prepared.hpp:176-210` |
+| 参数数量检查 | 编译期+运行期检查 | ✅ 已实现 | `include/fox-mysql/connection_prepared.hpp:232-236` |
 | **语句缓存** | | | |
-| FIFO 缓存 | deque 实现（实际为 LRU） | ⚠️ 实现差异 | `include/yxmysql/connection.h:88` |
+| FIFO 缓存 | deque 实现（实际为 LRU） | ⚠️ 实现差异 | `include/fox-mysql/connection.h:88` |
 | 缓存 Key | db_name + '\n' + trim(sql) | ✅ 已实现 | `src/connection.cpp:233-250` |
 | 缓存容量 | 默认 32，可配置 | ✅ 已实现 | `src/connection.cpp:302` |
 | close 清空缓存 | 析构/close 时清空 | ✅ 已实现 | `src/connection.cpp:40-43,119-120` |
@@ -35,14 +35,14 @@
 | USE db 清空缓存 | 切换数据库后清空 | ❌ **未实现** | - |
 | **错误处理** | | | |
 | 白名单重试 | 4 种错误码重试 | ✅ 已实现 | `src/connection.cpp:315-357` |
-| 仅重试一次 | retry_attempted 标志 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:11,64` |
+| 仅重试一次 | retry_attempted 标志 | ✅ 已实现 | `include/fox-mysql/connection_prepared.hpp:11,64` |
 | ER_UNSUPPORTED_PS | 不支持的语句不入缓存 | ✅ 已实现 | `src/connection.cpp:290-293` |
 | **执行流程** | | | |
-| reset + bind + execute | 完整流程 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:10-127` |
-| 设置 UPDATE_MAX_LENGTH | 查询时设置属性 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:101-104` |
-| store_result | 查询时存储结果 | ✅ 已实现 | `include/yxmysql/connection_prepared.hpp:107` |
+| reset + bind + execute | 完整流程 | ✅ 已实现 | `include/fox-mysql/connection_prepared.hpp:10-127` |
+| 设置 UPDATE_MAX_LENGTH | 查询时设置属性 | ✅ 已实现 | `include/fox-mysql/connection_prepared.hpp:101-104` |
+| store_result | 查询时存储结果 | ✅ 已实现 | `include/fox-mysql/connection_prepared.hpp:107` |
 | **ResultSet 一致性** | | | |
-| 统一接口 | 与非 prepared 接口一致 | ✅ 已实现 | `include/yxmysql/result_set.h` |
+| 统一接口 | 与非 prepared 接口一致 | ✅ 已实现 | `include/fox-mysql/result_set.h` |
 | **可选功能** | | | |
 | 日志与指标 | 缓存命中/淘汰计数等 | ⚠️ 未实现 | - |
 
@@ -87,7 +87,7 @@ std::unique_ptr<ResultSet> query_prepared(std::string_view sql, Args&&... params
 
 * 仅支持位置占位符 `?`。
 * 参数个数必须与 `mysql_stmt_param_count(stmt)` 一致，否则抛异常。
-* 支持：整数、浮点、字符串、二进制、可空、日期时间类型（与 `yxmysql::types` 对齐）。
+* 支持：整数、浮点、字符串、二进制、可空、日期时间类型（与 `fox::mysql::types` 对齐）。
 
 ---
 
@@ -141,7 +141,7 @@ std::unique_ptr<ResultSet> query_prepared(std::string_view sql, Args&&... params
 * `ER_UNKNOWN_STMT_HANDLER`
 * `ER_NEED_REPREPARE`
 
-**其余错误**：直接抛 `yxmysql::exception`。
+**其余错误**：直接抛 `fox::mysql::exception`。
 
 * 包括：语法错误、权限不足、死锁/唯一键冲突、`ER_UNSUPPORTED_PS`（语句不支持 prepare）等。
 * `ER_UNSUPPORTED_PS` 情况下，该 SQL **不入缓存**。

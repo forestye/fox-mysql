@@ -1,15 +1,15 @@
-#include "yxmysql/yxmysql.h"
+#include "fox-mysql/fox-mysql.h"
 #include <iostream>
 
 int main() {
     try {
-        yxmysql::ConnectionConfig config;
+        fox::mysql::ConnectionConfig config;
         config.host = "localhost";
         config.user = "test";
         config.password = "test";
         config.database = "testdb";
         
-        yxmysql::Connection conn(config);
+        fox::mysql::Connection conn(config);
         
         std::cout << "Connected to MySQL successfully!\n";
         
@@ -47,12 +47,12 @@ int main() {
             conn.execute("UPDATE users SET age = age + 1");
             conn.commit();
             std::cout << "\nTransaction committed successfully\n";
-        } catch (const yxmysql::SQLException& e) {
+        } catch (const fox::mysql::SQLException& e) {
             conn.rollback();
             std::cout << "Transaction rolled back: " << e.what() << std::endl;
         }
         
-    } catch (const yxmysql::SQLException& e) {
+    } catch (const fox::mysql::SQLException& e) {
         std::cerr << "MySQL Error: " << e.what() << " (Code: " << e.error_code() << ")" << std::endl;
         return 1;
     } catch (const std::exception& e) {

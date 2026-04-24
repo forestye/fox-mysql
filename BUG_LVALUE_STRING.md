@@ -13,7 +13,7 @@
 ### 错误信息
 
 ```bash
-undefined reference to `void yxmysql::Connection::bind_param<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&>(
+undefined reference to `void fox::mysql::Connection::bind_param<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&>(
     MYSQL_BIND&,
     std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&,
     std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >,
@@ -23,7 +23,7 @@ undefined reference to `void yxmysql::Connection::bind_param<std::__cxx11::basic
 ### 失败的代码示例
 
 ```cpp
-#include "yxmysql/pool.h"
+#include "fox-mysql/pool.h"
 
 auto conn = pool.acquire();
 
@@ -127,7 +127,7 @@ auto rs = conn->query_prepared(
 
 在 `prepare_and_bind_params()` 中检测并转换左值引用：
 
-**文件**: `include/yxmysql/connection_prepared.hpp`
+**文件**: `include/fox-mysql/connection_prepared.hpp`
 
 ```cpp
 template<typename... Args>
@@ -196,23 +196,23 @@ void Connection::bind_param<std::string&>(
 创建文件 `test_lvalue_string_fix.cpp`:
 
 ```cpp
-#include "yxmysql/pool.h"
+#include "fox-mysql/pool.h"
 #include <iostream>
 #include <cassert>
 
 int main() {
     // 1. 配置连接
-    yxmysql::ConnectionConfig config;
+    fox::mysql::ConnectionConfig config;
     config.host = "localhost";
     config.user = "test";
     config.password = "test";
     config.database = "testdb";
 
     // 2. 创建连接池
-    yxmysql_pool::PoolOptions opts;
+    fox::mysql::pool::PoolOptions opts;
     opts.min_size = 1;
     opts.max_size = 5;
-    yxmysql_pool::ConnectionPool pool(config, opts);
+    fox::mysql::pool::ConnectionPool pool(config, opts);
 
     // 3. 准备测试数据
     auto conn = pool.acquire();
@@ -284,7 +284,7 @@ int main() {
 
 ```bash
 # 编译测试
-g++ -std=c++17 test_lvalue_string_fix.cpp -I include -L build -lyxmysql -lmysqlclient -o test_lvalue
+g++ -std=c++17 test_lvalue_string_fix.cpp -I include -L build -lfox-mysql -lmysqlclient -o test_lvalue
 
 # 运行测试
 ./test_lvalue
@@ -372,7 +372,7 @@ auto rs = conn->query(sql);
 ## 相关文件
 
 - **需修改的文件**:
-  - `include/yxmysql/connection_prepared.hpp` - 添加左值引用处理逻辑
+  - `include/fox-mysql/connection_prepared.hpp` - 添加左值引用处理逻辑
 
 - **测试文件**:
   - `test_lvalue_string_fix.cpp` - 验证修复的测试

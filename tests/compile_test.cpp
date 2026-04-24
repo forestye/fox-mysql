@@ -1,19 +1,19 @@
-#include "yxmysql/exception.h"
-#include "yxmysql/types.h"
+#include "fox-mysql/exception.h"
+#include "fox-mysql/types.h"
 
 int main() {
     try {
-        yxmysql::ConnectionConfig config;
+        fox::mysql::ConnectionConfig config;
         config.host = "localhost";
         config.user = "test";
         
-        yxmysql::SQLException ex("Test exception");
-        yxmysql::ConnectionException conn_ex("Connection error");
-        yxmysql::QueryException query_ex("Query error");
-        yxmysql::TypeConversionException type_ex("Type error");
+        fox::mysql::SQLException ex("Test exception");
+        fox::mysql::ConnectionException conn_ex("Connection error");
+        fox::mysql::QueryException query_ex("Query error");
+        fox::mysql::TypeConversionException type_ex("Type error");
         
         return 0;
-    } catch (const yxmysql::SQLException& e) {
+    } catch (const fox::mysql::SQLException& e) {
         return 1;
     }
 }

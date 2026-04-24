@@ -7,21 +7,21 @@ YXMySQL 连接池提供了高效、安全、可扩展的数据库连接管理功
 ### 1. 包含头文件
 
 ```cpp
-#include "yxmysql/pool.h"
+#include "fox-mysql/pool.h"
 ```
 
 ### 2. 配置连接池
 
 ```cpp
 // 数据库连接配置
-yxmysql::ConnectionConfig config;
+fox::mysql::ConnectionConfig config;
 config.host = "localhost";
 config.user = "your_user";
 config.password = "your_password";
 config.database = "your_database";
 
 // 连接池选项
-yxmysql_pool::PoolOptions pool_opts;
+fox::mysql::pool::PoolOptions pool_opts;
 pool_opts.min_size = 2;                                           // 最小连接数
 pool_opts.max_size = 16;                                          // 最大连接数
 pool_opts.acquire_timeout = std::chrono::seconds(5);              // 获取超时
@@ -33,7 +33,7 @@ pool_opts.rollback_on_return = true;                              // 归还时�
 ### 3. 创建连接池
 
 ```cpp
-yxmysql_pool::ConnectionPool pool(config, pool_opts);
+fox::mysql::pool::ConnectionPool pool(config, pool_opts);
 ```
 
 ### 4. 使用连接池
@@ -86,7 +86,7 @@ try {
     // 等待最多10秒获取连接
     auto conn = pool.acquire(std::chrono::seconds(10));
     // 使用连接...
-} catch (const yxmysql_pool::AcquireTimeoutException& e) {
+} catch (const fox::mysql::pool::AcquireTimeoutException& e) {
     std::cerr << "Failed to acquire connection: " << e.what() << std::endl;
 }
 ```
@@ -118,14 +118,14 @@ conn.reset();
 
 ```cpp
 // 高并发场景
-yxmysql_pool::PoolOptions high_concurrency;
+fox::mysql::pool::PoolOptions high_concurrency;
 high_concurrency.min_size = 5;
 high_concurrency.max_size = 50;
 high_concurrency.acquire_timeout = std::chrono::seconds(10);
 high_concurrency.health_check_on_acquire = true;
 
 // 轻量级场景  
-yxmysql_pool::PoolOptions lightweight;
+fox::mysql::pool::PoolOptions lightweight;
 lightweight.min_size = 1;
 lightweight.max_size = 5;
 lightweight.acquire_timeout = std::chrono::seconds(3);
@@ -140,19 +140,19 @@ lightweight.idle_max_age = std::chrono::minutes(2);
 try {
     auto conn = pool.acquire();
     // 使用连接...
-} catch (const yxmysql_pool::AcquireTimeoutException& e) {
+} catch (const fox::mysql::pool::AcquireTimeoutException& e) {
     // 获取连接超时
     std::cerr << "Acquire timeout: " << e.what() << std::endl;
-} catch (const yxmysql_pool::PoolShutdownException& e) {
+} catch (const fox::mysql::pool::PoolShutdownException& e) {
     // 连接池已关闭
     std::cerr << "Pool shutdown: " << e.what() << std::endl;
-} catch (const yxmysql_pool::HealthCheckException& e) {
+} catch (const fox::mysql::pool::HealthCheckException& e) {
     // 健康检查失败
     std::cerr << "Health check failed: " << e.what() << std::endl;
-} catch (const yxmysql_pool::PoolException& e) {
+} catch (const fox::mysql::pool::PoolException& e) {
     // 其他连接池错误
     std::cerr << "Pool error: " << e.what() << std::endl;
-} catch (const yxmysql::SQLException& e) {
+} catch (const fox::mysql::SQLException& e) {
     // 数据库相关错误
     std::cerr << "Database error: " << e.what() << std::endl;
 }
@@ -166,7 +166,7 @@ try {
 #include <thread>
 #include <vector>
 
-void worker_thread(yxmysql_pool::ConnectionPool& pool, int thread_id) {
+void worker_thread(fox::mysql::pool::ConnectionPool& pool, int thread_id) {
     try {
         auto conn = pool.acquire();
         // 执行数据库操作...

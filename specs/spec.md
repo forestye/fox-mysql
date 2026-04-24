@@ -15,14 +15,14 @@
 | 功能模块 | 设计要求 | 实现状态 | 代码位置 |
 |---------|---------|---------|---------|
 | RAII 连接管理 | 构造即连接，析构自动释放 | ✅ 已实现 | `src/connection.cpp:30-43` |
-| 智能指针管理 | 使用 unique_ptr 管理资源 | ✅ 已实现 | `include/yxmysql/connection.h:31` |
-| 异常体系 | SQLException 及子类 | ✅ 已实现 | `include/yxmysql/exception.h:8-49` |
-| 移动语义 | 禁拷贝、可移动 | ✅ 已实现 | `include/yxmysql/connection.h:21-24` |
+| 智能指针管理 | 使用 unique_ptr 管理资源 | ✅ 已实现 | `include/fox-mysql/connection.h:31` |
+| 异常体系 | SQLException 及子类 | ✅ 已实现 | `include/fox-mysql/exception.h:8-49` |
+| 移动语义 | 禁拷贝、可移动 | ✅ 已实现 | `include/fox-mysql/connection.h:21-24` |
 | 现代语法 | string_view、enum class、chrono | ✅ 已实现 | 全局使用 |
-| 连接接口 | connect/close/ping/escape | ✅ 已实现 | `include/yxmysql/connection.h:26-41` |
-| 查询接口 | execute/query | ✅ 已实现 | `include/yxmysql/connection.h:31-32` |
-| 结果集封装 | ResultSet 类 | ✅ 已实现 | `include/yxmysql/result_set.h` |
-| 事务支持 | begin/commit/rollback | ✅ 已实现 | `include/yxmysql/connection.h:46-48` |
+| 连接接口 | connect/close/ping/escape | ✅ 已实现 | `include/fox-mysql/connection.h:26-41` |
+| 查询接口 | execute/query | ✅ 已实现 | `include/fox-mysql/connection.h:31-32` |
+| 结果集封装 | ResultSet 类 | ✅ 已实现 | `include/fox-mysql/result_set.h` |
+| 事务支持 | begin/commit/rollback | ✅ 已实现 | `include/fox-mysql/connection.h:46-48` |
 
 ### 扩展功能实现
 
@@ -89,7 +89,7 @@
 
 ### （1）连接层
 
-* 类名建议：`yxmysql::Connection`
+* 类名建议：`fox::mysql::Connection`
 * 职责：管理数据库连接生命周期，封装 `mysql_real_connect` 等。
 * 提供接口：
 
@@ -100,7 +100,7 @@
 
 ### （2）查询执行层
 
-* 类名建议：`yxmysql::Statement` 或直接由 `Connection` 提供方法。
+* 类名建议：`fox::mysql::Statement` 或直接由 `Connection` 提供方法。
 * 职责：执行 SQL 语句，返回结果集对象。
 * 提供接口：
 
@@ -109,7 +109,7 @@
 
 ### （3）结果集封装层
 
-* 类名建议：`yxmysql::ResultSet`
+* 类名建议：`fox::mysql::ResultSet`
 * 职责：封装 `MYSQL_RES` 与迭代结果行。
 * 提供接口：
 
@@ -121,7 +121,7 @@
 
 ### （4）错误处理层
 
-* 类名建议：`yxmysql::SQLException`
+* 类名建议：`fox::mysql::SQLException`
 * 封装错误码与错误信息。
 
 ---
@@ -130,7 +130,7 @@
 
 * **连接池**
 
-  * 单独实现 `ConnectionPool` 模块，内部维护多个 `yxmysql::Connection` 实例。
+  * 单独实现 `ConnectionPool` 模块，内部维护多个 `fox::mysql::Connection` 实例。
   * 对本库无侵入。
 
 * **ORM**

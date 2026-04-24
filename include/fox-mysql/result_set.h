@@ -1,7 +1,7 @@
 #pragma once
 
-#include "yxmysql/types.h"
-#include "yxmysql/exception.h"
+#include "fox-mysql/types.h"
+#include "fox-mysql/exception.h"
 #include <mysql/mysql.h>
 #include <memory>
 #include <string>
@@ -10,7 +10,7 @@
 #include <map>
 #include <optional>
 
-namespace yxmysql {
+namespace fox::mysql {
 
 class ResultSet {
 public:
@@ -79,4 +79,4 @@ private:
     bool is_stmt_result_;
 };
 
-}  // namespace yxmysql
+}  // namespace fox::mysql

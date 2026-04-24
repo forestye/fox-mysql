@@ -15,19 +15,19 @@
 | 功能模块 | 设计要求 | 实现状态 | 代码位置 |
 |---------|---------|---------|---------|
 | **核心功能** | | | |
-| PoolOptions 配置 | 6 个配置选项 | ✅ 已实现 | `include/yxmysql/pool.h:15-22` |
-| PooledConn 句柄 | RAII、移动语义 | ✅ 已实现 | `include/yxmysql/pool.h:28-57` |
-| 线程安全 | mutex + condition_variable | ✅ 已实现 | `include/yxmysql/pool.h:107-108` |
+| PoolOptions 配置 | 6 个配置选项 | ✅ 已实现 | `include/fox-mysql/pool.h:15-22` |
+| PooledConn 句柄 | RAII、移动语义 | ✅ 已实现 | `include/fox-mysql/pool.h:28-57` |
+| 线程安全 | mutex + condition_variable | ✅ 已实现 | `include/fox-mysql/pool.h:107-108` |
 | 预热机制 | 构造时创建 min_size 连接 | ✅ 已实现 | `src/pool.cpp:82-95` |
 | 健康检查 | ping + 重连 | ✅ 已实现 | `src/pool.cpp:103-125` |
 | 弹性伸缩 | 按需扩容、空闲回收 | ✅ 已实现 | `src/pool.cpp:127-156,196-208` |
 | 阻塞与超时 | 支持超时等待 | ✅ 已实现 | `src/pool.cpp:213-218` |
 | 兜底 rollback | 归还时执行 rollback | ✅ 已实现 | `src/pool.cpp:237-254` |
 | 两阶段回收 | 锁内移出、锁外析构 | ✅ 已实现 | `src/pool.cpp:129-156` |
-| 异常体系 | 4 种 Pool 异常 | ✅ 已实现 | `include/yxmysql/pool.h:123-144` |
+| 异常体系 | 4 种 Pool 异常 | ✅ 已实现 | `include/fox-mysql/pool.h:123-144` |
 | 关闭处理 | shutdown 标志 + 唤醒 | ✅ 已实现 | `src/pool.cpp:71-80` |
 | **指标统计** | | | |
-| 基础指标 | 6 个 atomic 计数器 | ✅ 已实现 | `include/yxmysql/pool.h:114-119` |
+| 基础指标 | 6 个 atomic 计数器 | ✅ 已实现 | `include/fox-mysql/pool.h:114-119` |
 | **可选功能** | | | |
 | 日志输出 | 创建/销毁/超时等日志 | ⚠️ 未实现 | - |
 | 详细时间统计 | 平均等待时间、P95 等 | ⚠️ 未实现 | - |
@@ -46,7 +46,7 @@
 
 ## 背景与目标
 
-本设计基于已有的 `yxmysql::Connection` 封装，构建一个高效、稳定、可扩展的连接池组件。目标包括：
+本设计基于已有的 `fox::mysql::Connection` 封装，构建一个高效、稳定、可扩展的连接池组件。目标包括：
 
 * **线程安全**：支持多线程并发 `acquire()` / `release()`。
 * **稳定性**：获取时可进行健康检查（`ping()`）、失败时自动重连。
@@ -59,7 +59,7 @@
 
 ## 与现有封装的关系与假设
 
-* 底层使用 `yxmysql::Connection`（以下简称 **Conn**）。
+* 底层使用 `fox::mysql::Connection`（以下简称 **Conn**）。
 * `connect()` 成功后视为可用；`close()` 彻底关闭。
 * `ping()` 作为健康检查；失败时尝试一次 **重连**。
 * `is_connected()` 是轻量健康信号，但获取时仍需 `ping()` 确认。
@@ -69,10 +69,10 @@
 
 ## 命名空间与核心 API
 
-连接池放在单独命名空间 `yxmysql_pool`：
+连接池放在单独命名空间 `fox::mysql::pool`：
 
 ```cpp
-namespace yxmysql_pool {
+namespace fox::mysql::pool {
 
 struct PoolOptions {
     size_t min_size = 2;
@@ -94,8 +94,8 @@ public:
     ~PooledConn();                       // 析构自动归还
     // 可跨线程移动，但不得多线程并发使用
 
-    yxmysql::Connection* operator->() const noexcept;
-    yxmysql::Connection& ref() const;
+    fox::mysql::Connection* operator->() const noexcept;
+    fox::mysql::Connection& ref() const;
     void reset();                        // 显式归还
 };
 
@@ -109,7 +109,7 @@ public:
     size_t idle_count() const;
 };
 
-} // namespace yxmysql_pool
+} // namespace fox::mysql::pool
 ```
 
 ---
@@ -210,7 +210,7 @@ public:
 
 ```
 +----------------------------+        *   1      +--------------------+
-| yxmysql_pool::ConnectionPool |---------------| yxmysql::Connection |
+| fox::mysql::pool::ConnectionPool |---------------| fox::mysql::Connection |
 | - idle_: queue<Conn>         owns           | (已有封装类)        |
 | - total_, shutdown_                         +--------------------+
 +----------------------------+                 ^
@@ -218,7 +218,7 @@ public:
 +----------------------------+                 |
                                               |
                                    +------------------------+
-                                   | yxmysql_pool::PooledConn|
+                                   | fox::mysql::pool::PooledConn|
                                    | - pool_                 |
                                    | - conn_                 |
                                    +------------------------+
