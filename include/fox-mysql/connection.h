@@ -91,6 +91,18 @@ private:
     // 参数绑定缓冲区(用于保持字符串生命周期)
     std::vector<MYSQL_BIND> param_binds_;
     std::vector<std::string> param_string_buffers_;
+
+    // 数值参数槽位(每槽位 8 字节、按 double 对齐)。
+    // 替代原先 bind_param<int/long long/double/float> 中的 static thread_local 局部变量
+    // —— 这些 static 在同一条 SQL 含多个同类型数值参数时会互相覆盖，
+    // 导致 MYSQL_BIND 都指向同一个被最后一次写入的值。
+    union ScalarParamSlot {
+        int i;
+        long long ll;
+        double d;
+        float f;
+    };
+    std::vector<ScalarParamSlot> param_scalar_buffers_;
 };
 
 }  // namespace fox::mysql

@@ -128,46 +128,50 @@ std::unique_ptr<ResultSet> Connection::query_prepared(std::string_view sql, Args
 }
 
 // 参数绑定的特化实现
+// 数值类型不能再用 static thread_local 局部变量做载体：同一条 SQL 里的多个同类型
+// 参数会共享同一个 static，使得所有 MYSQL_BIND 都指向最后一次写入的值。
+// 改为按参数位置在 param_scalar_buffers_ 中各占一个槽，地址稳定（prepare_and_bind_params
+// 已 reserve 到 param_count，emplace_back 不会触发重分配）。
 template<>
 inline void Connection::bind_param<int>(MYSQL_BIND& bind, int&& value, std::vector<std::string>& /* string_buffers */) {
-    static thread_local int temp_int;
-    temp_int = value;
-    
+    auto& slot = param_scalar_buffers_.emplace_back();
+    slot.i = value;
+
     bind.buffer_type = MYSQL_TYPE_LONG;
-    bind.buffer = &temp_int;
+    bind.buffer = &slot.i;
     bind.buffer_length = sizeof(int);
     bind.is_null = nullptr;
 }
 
 template<>
 inline void Connection::bind_param<long long>(MYSQL_BIND& bind, long long&& value, std::vector<std::string>& /* string_buffers */) {
-    static thread_local long long temp_longlong;
-    temp_longlong = value;
-    
+    auto& slot = param_scalar_buffers_.emplace_back();
+    slot.ll = value;
+
     bind.buffer_type = MYSQL_TYPE_LONGLONG;
-    bind.buffer = &temp_longlong;
+    bind.buffer = &slot.ll;
     bind.buffer_length = sizeof(long long);
     bind.is_null = nullptr;
 }
 
 template<>
 inline void Connection::bind_param<double>(MYSQL_BIND& bind, double&& value, std::vector<std::string>& /* string_buffers */) {
-    static thread_local double temp_double;
-    temp_double = value;
-    
+    auto& slot = param_scalar_buffers_.emplace_back();
+    slot.d = value;
+
     bind.buffer_type = MYSQL_TYPE_DOUBLE;
-    bind.buffer = &temp_double;
+    bind.buffer = &slot.d;
     bind.buffer_length = sizeof(double);
     bind.is_null = nullptr;
 }
 
 template<>
 inline void Connection::bind_param<float>(MYSQL_BIND& bind, float&& value, std::vector<std::string>& /* string_buffers */) {
-    static thread_local float temp_float;
-    temp_float = value;
-    
+    auto& slot = param_scalar_buffers_.emplace_back();
+    slot.f = value;
+
     bind.buffer_type = MYSQL_TYPE_FLOAT;
-    bind.buffer = &temp_float;
+    bind.buffer = &slot.f;
     bind.buffer_length = sizeof(float);
     bind.is_null = nullptr;
 }
@@ -237,10 +241,14 @@ void Connection::prepare_and_bind_params(MYSQL_STMT* stmt, Args&&... params) {
     }
 
     if constexpr (param_count > 0) {
-        // 使用成员变量而不是局部变量，以保持字符串生命周期
+        // 使用成员变量而不是局部变量，以保持字符串/数值参数生命周期。
+        // reserve 到 param_count 关键：保证 emplace_back 不会触发重分配，
+        // 否则之前 bind 中保存的 buffer 指针会失效。
         param_binds_.resize(param_count);
         param_string_buffers_.clear();
-        param_string_buffers_.reserve(param_count); // 预留空间
+        param_string_buffers_.reserve(param_count);
+        param_scalar_buffers_.clear();
+        param_scalar_buffers_.reserve(param_count);
 
         // 清零MYSQL_BIND结构
         std::memset(param_binds_.data(), 0, sizeof(MYSQL_BIND) * param_count);
