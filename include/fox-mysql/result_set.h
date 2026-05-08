@@ -66,7 +66,10 @@ private:
     // 预编译语句成员
     MYSQL_STMT* stmt_;
     std::vector<MYSQL_BIND> result_binds_;
-    std::vector<std::string> string_buffers_;
+    // 稳定地址缓冲区：vector<char> 在不 resize 时 .data() 不会失效，
+    // 所以 result_binds_[i].buffer 始终指向有效内存。
+    // 每个 buffer 多分配 1 字节用于在 fetch 后写入 '\0'，方便 strtoll/strtod 解析。
+    std::vector<std::vector<char>> result_buffers_;
     std::vector<unsigned long> lengths_;
     std::vector<char> is_nulls_;
     std::vector<char> errors_;

@@ -55,7 +55,7 @@ ResultSet::ResultSet(ResultSet&& other) noexcept
     : result_(std::move(other.result_)), current_row_(other.current_row_),
       field_lengths_(other.field_lengths_), stmt_(other.stmt_),
       result_binds_(std::move(other.result_binds_)),
-      string_buffers_(std::move(other.string_buffers_)),
+      result_buffers_(std::move(other.result_buffers_)),
       lengths_(std::move(other.lengths_)),
       is_nulls_(std::move(other.is_nulls_)),
       errors_(std::move(other.errors_)),
@@ -91,7 +91,7 @@ ResultSet& ResultSet::operator=(ResultSet&& other) noexcept {
         field_lengths_ = other.field_lengths_;
         stmt_ = other.stmt_;
         result_binds_ = std::move(other.result_binds_);
-        string_buffers_ = std::move(other.string_buffers_);
+        result_buffers_ = std::move(other.result_buffers_);
         lengths_ = std::move(other.lengths_);
         is_nulls_ = std::move(other.is_nulls_);
         errors_ = std::move(other.errors_);
@@ -135,20 +135,31 @@ bool ResultSet::next() {
             has_current_row_ = false;
             return false;
         } else if (fetch_result == MYSQL_DATA_TRUNCATED) {
-            // 数据被截断，需要重新获取被截断的列
+            // 数据被截断，重新分配 buffer 并 refetch 被截断的列。
+            // lengths_[i] 是 MySQL 报告的实际数据长度（与 buffer_length 无关），
+            // 我们扩容到 actual_length+1，然后用 fetch_column 从偏移 0 开始重读。
+            // 注意：vector 扩容会改变 .data() 地址，而 mysql_stmt_bind_result 在内部
+            // 拷贝过 bind 数组，不会同步看到我们修改后的指针；必须在所有 buffer
+            // 调整完后重新调用 mysql_stmt_bind_result，否则下一行 fetch 会写入已释放内存。
+            bool rebind_needed = false;
             for (unsigned int i = 0; i < field_count_; ++i) {
                 if (errors_[i]) {
-                    // 这一列被截断了，重新分配缓冲区并获取数据
                     unsigned long actual_length = lengths_[i];
-                    string_buffers_[i].resize(actual_length + 1);
+                    result_buffers_[i].assign(actual_length + 1, '\0');
 
-                    result_binds_[i].buffer = &string_buffers_[i][0];
+                    result_binds_[i].buffer = result_buffers_[i].data();
                     result_binds_[i].buffer_length = actual_length;
+                    rebind_needed = true;
 
-                    // 重新获取这一列的数据
                     if (mysql_stmt_fetch_column(stmt_, &result_binds_[i], i, 0) != 0) {
                         throw SQLException("Failed to fetch truncated column: " + std::string(mysql_stmt_error(stmt_)));
                     }
+                    errors_[i] = 0;
+                }
+            }
+            if (rebind_needed) {
+                if (mysql_stmt_bind_result(stmt_, result_binds_.data()) != 0) {
+                    throw SQLException("Failed to rebind result after truncation: " + std::string(mysql_stmt_error(stmt_)));
                 }
             }
             fetch_stmt_row();
@@ -314,19 +325,27 @@ std::vector<std::string> ResultSet::get_row_as_vector() const {
     if (!has_current_row_) {
         throw SQLException("No current row available");
     }
-    
+
     std::vector<std::string> row;
     row.reserve(field_count_);
-    
+
     for (unsigned int i = 0; i < field_count_; ++i) {
-        const char* value = current_row_[i];
-        if (value) {
-            row.emplace_back(value, field_lengths_[i]);
+        if (is_stmt_result_) {
+            if (is_nulls_[i]) {
+                row.emplace_back();
+            } else {
+                row.emplace_back(result_buffers_[i].data(), lengths_[i]);
+            }
         } else {
-            row.emplace_back();
+            const char* value = current_row_[i];
+            if (value) {
+                row.emplace_back(value, field_lengths_[i]);
+            } else {
+                row.emplace_back();
+            }
         }
     }
-    
+
     return row;
 }
 
@@ -334,20 +353,28 @@ std::map<std::string, std::string> ResultSet::get_row_as_map() const {
     if (!has_current_row_) {
         throw SQLException("No current row available");
     }
-    
+
     std::map<std::string, std::string> row;
-    
+
     for (unsigned int i = 0; i < field_count_; ++i) {
         std::string field_name = fields_[i].name;
-        const char* value = current_row_[i];
-        
-        if (value) {
-            row[field_name] = std::string(value, field_lengths_[i]);
+
+        if (is_stmt_result_) {
+            if (is_nulls_[i]) {
+                row[field_name] = std::string();
+            } else {
+                row[field_name] = std::string(result_buffers_[i].data(), lengths_[i]);
+            }
         } else {
-            row[field_name] = std::string();
+            const char* value = current_row_[i];
+            if (value) {
+                row[field_name] = std::string(value, field_lengths_[i]);
+            } else {
+                row[field_name] = std::string();
+            }
         }
     }
-    
+
     return row;
 }
 
@@ -387,7 +414,7 @@ const char* ResultSet::get_field_value(int column_index) const {
         if (is_nulls_[column_index]) {
             return nullptr;
         }
-        return string_buffers_[column_index].c_str();
+        return result_buffers_[column_index].data();
     } else {
         return current_row_[column_index];
     }
@@ -403,59 +430,51 @@ unsigned long ResultSet::get_field_length(int column_index) const {
 
 void ResultSet::init_stmt_binds() {
     result_binds_.resize(field_count_);
-    string_buffers_.resize(field_count_);
+    result_buffers_.resize(field_count_);
     lengths_.resize(field_count_);
     is_nulls_.resize(field_count_);
     errors_.resize(field_count_);
 
-    // 清零绑定结构
     std::memset(result_binds_.data(), 0, sizeof(MYSQL_BIND) * field_count_);
 
     for (unsigned int i = 0; i < field_count_; ++i) {
-        // 为每个字段预分配缓冲区
-        // 使用字段定义的最大长度，如果不可用则使用较大的默认值
-        unsigned long buffer_size = fields_[i].length;  // 字段定义长度(如VARCHAR(100)的100)
-
-        // 对于BLOB/TEXT类型或未知长度的字段，使用更大的缓冲区
+        // fields_[i].length 是字段定义的最大长度（如 VARCHAR(100) 的 100）。
+        // 对于 BLOB/TEXT 或长度不明的字段使用 64KB 默认值；
+        // 超长的列会触发 MYSQL_DATA_TRUNCATED，由 next() 中的截断分支扩容并 refetch。
+        unsigned long buffer_size = fields_[i].length;
         if (buffer_size == 0 || buffer_size > 65535) {
-            buffer_size = 65535;  // 64KB默认缓冲区
+            buffer_size = 65535;
         }
 
-        string_buffers_[i].resize(buffer_size + 1);
+        // 多分配 1 字节用于 fetch 后写入 '\0'，让 strtoll/strtod 等 C 字符串 API 可直接解析。
+        result_buffers_[i].assign(buffer_size + 1, '\0');
 
         result_binds_[i].buffer_type = MYSQL_TYPE_STRING;
-        result_binds_[i].buffer = &string_buffers_[i][0];
+        result_binds_[i].buffer = result_buffers_[i].data();
         result_binds_[i].buffer_length = buffer_size;
         result_binds_[i].length = &lengths_[i];
         result_binds_[i].is_null = reinterpret_cast<bool*>(&is_nulls_[i]);
         result_binds_[i].error = reinterpret_cast<bool*>(&errors_[i]);
     }
 
-    // 绑定结果
     if (mysql_stmt_bind_result(stmt_, result_binds_.data()) != 0) {
         throw SQLException("Failed to bind result: " + std::string(mysql_stmt_error(stmt_)));
     }
 }
 
 void ResultSet::fetch_stmt_row() {
-    // MySQL已经将数据写入到buffer中，我们只需要调整string的长度即可
-    // 注意：string_buffers_已经绑定为MySQL的输出buffer，不能重新分配
-    // 我们只需要设置正确的长度（string末尾到实际数据长度）
+    // MySQL 直接写入 result_buffers_，无需复制；只需把数据末尾置零，
+    // 让 get_field_value 返回的指针对 strtoll/strtod 安全。
     for (unsigned int i = 0; i < field_count_; ++i) {
-        if (!is_nulls_[i]) {
-            // 不能使用resize()或assign()，因为那会重新分配内存
-            // MySQL已经把数据写入buffer了，我们直接创建新的string_view就行
-            // 但由于get_field_value返回的是string的c_str()，我们需要确保string正确
-            // 关键：在初始化时预分配足够大的buffer，然后不要改变它的地址
-            // 这里只能通过黑科技手段修改string的内部长度
-            // 更好的方案：重新设计，不使用string作为buffer
-
-            // 暂时的解决方案：每次从buffer复制到新的string
-            std::string temp(static_cast<const char*>(result_binds_[i].buffer), lengths_[i]);
-            string_buffers_[i] = std::move(temp);
-        } else {
-            string_buffers_[i].clear();
+        if (is_nulls_[i]) {
+            continue;
         }
+        unsigned long len = lengths_[i];
+        // 截断分支已在 next() 中处理并清掉 errors_；走到这里时 buffer 一定能容纳 len+1。
+        if (len >= result_buffers_[i].size()) {
+            len = result_buffers_[i].size() - 1;
+        }
+        result_buffers_[i][len] = '\0';
     }
 }
 
