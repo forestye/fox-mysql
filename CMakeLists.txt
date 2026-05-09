@@ -9,43 +9,25 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-find_path(MYSQL_INCLUDE_DIR mysql/mysql.h
-    HINTS /usr/include /usr/local/include
-)
+include(GNUInstallDirs)
 
-find_library(MYSQL_LIBRARY NAMES mysqlclient
-    HINTS /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu
-)
-
-if(NOT MYSQL_INCLUDE_DIR OR NOT MYSQL_LIBRARY)
-    message(STATUS "MySQL not found, creating header-only version for testing")
-    set(MYSQL_FOUND FALSE)
-else()
-    set(MYSQL_FOUND TRUE)
-    set(MYSQL_INCLUDE_DIRS ${MYSQL_INCLUDE_DIR})
-    set(MYSQL_LIBRARIES ${MYSQL_LIBRARY})
-endif()
-
-include_directories(include)
+# 使用 pkg-config 创建 IMPORTED_TARGET (PkgConfig::mysqlclient), 这样:
+# 1. 同机器构建/安装/消费时无需硬编码 libmysqlclient 的绝对路径；
+# 2. 安装后被消费时, fox-mysqlConfig.cmake 会在消费方机器上重新解析,
+#    避免不同发行版库布局差异 (/usr/lib/x86_64-linux-gnu vs /usr/lib64) 引发的链接失败。
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(mysqlclient REQUIRED IMPORTED_TARGET mysqlclient)
 
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
-if(MYSQL_FOUND)
-    add_library(fox-mysql ${SOURCES})
-    target_include_directories(fox-mysql PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-        ${MYSQL_INCLUDE_DIRS}
-    )
-    target_link_libraries(fox-mysql ${MYSQL_LIBRARIES})
-else()
-    # Header-only version for testing compilation
-    add_library(fox-mysql INTERFACE)
-    target_include_directories(fox-mysql INTERFACE
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-    )
-endif()
+add_library(fox-mysql ${SOURCES})
+add_library(fox-mysql::fox-mysql ALIAS fox-mysql)
+
+target_include_directories(fox-mysql PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_link_libraries(fox-mysql PUBLIC PkgConfig::mysqlclient)
 
 option(BUILD_TESTS "Build tests" OFF)
 if(BUILD_TESTS)
@@ -60,22 +42,22 @@ endif()
 
 install(TARGETS fox-mysql
     EXPORT fox-mysqlTargets
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-install(DIRECTORY include/ DESTINATION include)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 install(EXPORT fox-mysqlTargets
     FILE fox-mysqlTargets.cmake
     NAMESPACE fox-mysql::
-    DESTINATION lib/cmake/fox-mysql
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fox-mysql
 )
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
-    "fox-mysqlConfigVersion.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/fox-mysqlConfigVersion.cmake"
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
@@ -83,11 +65,11 @@ write_basic_package_version_file(
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/fox-mysqlConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/fox-mysqlConfig.cmake"
-    INSTALL_DESTINATION lib/cmake/fox-mysql
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fox-mysql
 )
 
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/fox-mysqlConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/fox-mysqlConfigVersion.cmake"
-    DESTINATION lib/cmake/fox-mysql
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fox-mysql
 )

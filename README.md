@@ -28,6 +28,41 @@ cmake .. -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON
 make -j4
 ```
 
+## 安装与在你的项目里使用
+
+```bash
+# 在 fox-mysql 源码目录
+cmake -S . -B build
+cmake --build build
+sudo cmake --install build              # 默认装到 /usr/local
+# 或装到自定义前缀
+cmake --install build --prefix /opt/fox-mysql
+```
+
+之后在你自己的项目里只需用 `find_package`：
+
+```cmake
+cmake_minimum_required(VERSION 3.16)
+project(my_app LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+
+find_package(fox-mysql REQUIRED)        # 找不到时直接 fatal error
+
+add_executable(my_app main.cpp)
+target_link_libraries(my_app PRIVATE fox-mysql::fox-mysql)
+# libmysqlclient 会随 fox-mysql::fox-mysql 透传, 无需显式链接
+```
+
+如果装到了非默认前缀，构建你的项目时把前缀加到 `CMAKE_PREFIX_PATH`：
+
+```bash
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/opt/fox-mysql
+```
+
+> 实现说明：fox-mysql 通过 `pkg-config` (导出为 `PkgConfig::mysqlclient`) 引用
+> libmysqlclient，所以导出的 cmake 配置不含硬编码绝对路径，可在不同发行版
+> （`/usr/lib/x86_64-linux-gnu` vs `/usr/lib64` 等）间复用安装产物。
+
 ## 基础用法
 
 ### 1. 连接数据库
