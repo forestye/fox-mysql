@@ -202,7 +202,7 @@ config.charset = "utf8mb4";                         // 字符集
 config.connect_timeout = std::chrono::seconds{10};  // 连接超时
 config.read_timeout = std::chrono::seconds{30};     // 读超时
 config.write_timeout = std::chrono::seconds{30};    // 写超时
-config.auto_reconnect = true;                       // 自动重连
+config.auto_reconnect = true;                       // 历史字段, 已 no-op (MYSQL_OPT_RECONNECT 在 MySQL 8.0.34+ 弃用)
 config.multi_statements = false;                    // 多语句支持
 config.stmt_cache_capacity = 32;                    // 预编译语句缓存容量（默认 32）
 ```

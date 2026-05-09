@@ -15,6 +15,11 @@ struct ConnectionConfig {
     std::chrono::seconds connect_timeout{10};
     std::chrono::seconds read_timeout{30};
     std::chrono::seconds write_timeout{30};
+    // 历史字段, 现已是 no-op:
+    //   原通过 mysql_options(MYSQL_OPT_RECONNECT) 启用, 但该选项在
+    //   MySQL 8.0.34+ 弃用、8.4 移除, 且会打 deprecation warning。
+    //   重连改由应用层处理 (Connection 的 stmt 重试路径与 ConnectionPool
+    //   的按需建连)。字段保留以避免外部代码出现编译错误。
     bool auto_reconnect = true;
     bool multi_statements = false;
     size_t stmt_cache_capacity = 32;

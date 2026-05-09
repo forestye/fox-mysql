@@ -87,9 +87,14 @@ void Connection::connect() {
     timeout = static_cast<unsigned int>(config_.write_timeout.count());
     mysql_options(mysql_, MYSQL_OPT_WRITE_TIMEOUT, &timeout);
     
-    bool reconnect = config_.auto_reconnect;
-    mysql_options(mysql_, MYSQL_OPT_RECONNECT, &reconnect);
-    
+    // 不再调用 mysql_options(MYSQL_OPT_RECONNECT, ...):
+    //   - MySQL 8.0.34+ 弃用并在每次设置时打印 warning, 8.4 直接移除该选项；
+    //   - libmysql 层静默重连会丢失会话状态(事务/临时表/prepared stmt/锁等),
+    //     被官方视为 footgun, 推荐由应用层处理重连；
+    //   - 本库已有应用层重试 (Connection::handle_stmt_error_with_retry +
+    //     ConnectionPool::acquire 按需建连), 这条选项实际冗余。
+    // ConnectionConfig::auto_reconnect 字段保留作为源码兼容, 但已是 no-op。
+
     if (!config_.charset.empty()) {
         mysql_options(mysql_, MYSQL_SET_CHARSET_NAME, config_.charset.c_str());
     }
