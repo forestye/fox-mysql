@@ -151,6 +151,62 @@ static void test_consecutive_acquires_all_succeed() {
     CHECK(ok == static_cast<int>(opts.min_size + 2));
 }
 
+// 用例 4: 时间戳启发式预检 (idle_assume_stale): 取出 idle 太久的连接
+// 应直接销毁并新建, 而不走 ping。这是反应式自愈之外的优化路径, 用于消掉
+// 低频服务"首次请求 ping 失败延迟"。
+static void test_idle_assume_stale_skips_ping_path() {
+    std::cout << "[4] idle_assume_stale: 时间戳预检直接重建\n";
+
+    PoolOptions opts;
+    opts.min_size = 1;
+    opts.max_size = 2;
+    opts.health_check_on_acquire = false;  // 关掉 ping, 验证只有时间戳预检在工作
+    opts.idle_assume_stale = std::chrono::milliseconds(300);
+
+    ConnectionPool pool(make_config(), opts);
+
+    unsigned long original_tid;
+    {
+        auto c = pool.acquire();
+        original_tid = get_thread_id(c.ref());
+    }
+    CHECK(pool.idle_count() == 1);
+
+    // 等到超过 idle_assume_stale 阈值。
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+
+    // 此时这条连接其实还活着 (server 端 wait_timeout 远没到), 但时间戳预检
+    // 会"宁可错杀": 直接 discard 然后新建。验证 thread_id 变了。
+    auto c = pool.acquire();
+    unsigned long new_tid = get_thread_id(c.ref());
+    CHECK(new_tid != original_tid);
+}
+
+// 用例 5: idle_assume_stale 默认值 0 = 关闭, 不影响现有行为 (回归保护)。
+static void test_idle_assume_stale_zero_is_disabled() {
+    std::cout << "[5] idle_assume_stale=0 (默认): 连接照常复用\n";
+
+    PoolOptions opts;
+    opts.min_size = 1;
+    opts.max_size = 2;
+    opts.health_check_on_acquire = false;
+    // idle_assume_stale 不设, 默认 0
+
+    ConnectionPool pool(make_config(), opts);
+
+    unsigned long original_tid;
+    {
+        auto c = pool.acquire();
+        original_tid = get_thread_id(c.ref());
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+
+    // 没开预检, 连接应该被原样复用 (thread_id 相同)。
+    auto c = pool.acquire();
+    CHECK(get_thread_id(c.ref()) == original_tid);
+}
+
 // 用例 3: 健康检查关闭时, 拿到 stale 连接的行为不变 (回归保护: 不要意外改其它分支)。
 static void test_health_check_disabled_does_not_loop() {
     std::cout << "[3] health_check_on_acquire=false: 行为不变\n";
@@ -175,6 +231,8 @@ int main() {
         test_acquire_recovers_from_all_stale_idle();
         test_consecutive_acquires_all_succeed();
         test_health_check_disabled_does_not_loop();
+        test_idle_assume_stale_skips_ping_path();
+        test_idle_assume_stale_zero_is_disabled();
     } catch (const std::exception& e) {
         std::cerr << "FATAL: uncaught exception: " << e.what() << "\n";
         return 2;

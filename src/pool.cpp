@@ -181,9 +181,25 @@ PooledConn ConnectionPool::acquire(std::chrono::milliseconds timeout) {
         if (!idle_connections_.empty()) {
             auto pool_conn = std::move(idle_connections_.front());
             idle_connections_.pop();
-            
+
+            // 时间戳启发式预检: 如果用户配置了 idle_assume_stale 并且这个连接
+            // 在 idle 队列里待得超过该阈值, 假定 server 已经 wait_timeout 把它
+            // 关掉了 — 直接 destroy, 让外层 while 循环走 create_connection
+            // 新建一条。比让它走 health_check 的 ping+reconnect 路径省一次失败的
+            // RTT (server 端已 RST/timeout 的 socket, ping 一定会失败)。
+            // 0 = 关闭此优化时, 行为不变 (落到下面的 health_check_on_acquire)。
+            if (options_.idle_assume_stale.count() > 0) {
+                auto idle_for = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - pool_conn->last_used);
+                if (idle_for >= options_.idle_assume_stale) {
+                    total_connections_--;
+                    destroyed_total_++;
+                    continue;
+                }
+            }
+
             auto conn = std::move(pool_conn->conn);
-            
+
             // Health check if enabled
             if (options_.health_check_on_acquire) {
                 if (!health_check_connection(conn.get())) {
