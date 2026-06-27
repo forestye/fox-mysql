@@ -108,9 +108,13 @@ bool ConnectionPool::health_check_connection(fox::mysql::Connection* conn) {
     try {
         conn->ping();
         return true;
-    } catch (const fox::mysql::ConnectionException&) {
+    } catch (const fox::mysql::SQLException&) {
+        // ping 失败一定是连接级问题, 无论抛的是 ConnectionException 还是
+        // 其它 SQLException 子类, 都该尝试重连 (不存在"还能继续用"的情况)。
+        // 此前只 catch ConnectionException 会漏掉 ping 抛 SQLException 的路径,
+        // 导致 stale 连接被静默丢弃而非重建。
         reconnect_attempts_++;
-        
+
         try {
             conn->close();
             conn->connect();
@@ -183,12 +187,18 @@ PooledConn ConnectionPool::acquire(std::chrono::milliseconds timeout) {
             // Health check if enabled
             if (options_.health_check_on_acquire) {
                 if (!health_check_connection(conn.get())) {
+                    // stale 连接是 pool 的内部状态, 不应该上抛给业务方。
+                    // 丢弃后回到 while 循环, 让 pool 继续尝试下一个 idle 连接
+                    // 或在 idle 队列空时新建 — 业务方一次 acquire 最终拿到的就是
+                    // 一个能用的连接。修复前: idle 队列里有 N 个 stale 连接, 业务方
+                    // 就会被打 N 次 HealthCheckException (典型场景: 服务器闲置一夜后
+                    // 第一批用户登录连续踩雷)。
                     total_connections_--;
                     destroyed_total_++;
-                    throw HealthCheckException("Connection failed health check and could not be recovered");
+                    continue;
                 }
             }
-            
+
             return PooledConn(std::move(conn), this);
         }
         

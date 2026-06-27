@@ -137,8 +137,13 @@ bool Connection::is_connected() const noexcept {
 void Connection::ping() {
     check_connection();
     if (mysql_ping(mysql_) != 0) {
+        // ping 失败必然是连接级问题 (server 关掉了 idle 连接 / 网络断开 / wait_timeout),
+        // 抛 ConnectionException 而不是基类 SQLException, 以便 pool 的健康检查
+        // 路径能精准识别并走重连分支。
+        unsigned int code = mysql_errno(mysql_);
+        std::string msg = std::string("Connection lost, ping failed: ") + mysql_error(mysql_);
         connected_ = false;
-        throw_mysql_error("Connection lost, ping failed");
+        throw ConnectionException(msg, code);
     }
 }
 
