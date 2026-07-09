@@ -7,14 +7,18 @@
 
 namespace fox::mysql {
 
-template <typename... Args>
-void Connection::execute_prepared(std::string_view sql, Args&&... params) {
+// 执行骨架: reset → bind (由 bind_fn 注入) → execute → 可恢复错误重试一次。
+// 变参模板版与 vector<Param> 运行时版共用, 消除两份复制粘贴。
+// 注意 bind_fn 在重试时会被再次调用, 因此它不能移走外部状态 (vector 版
+// 从 const& 拷贝, 满足; 变参版行为与重构前一致)。
+template <typename BindFn>
+void Connection::execute_prepared_with(std::string_view sql, BindFn&& bind_fn) {
     bool retry_attempted = false;
-    
+
     while (true) {
         try {
             MYSQL_STMT* stmt = get_or_prepare_stmt(sql);
-            
+
             // 重置语句状态
             if (mysql_stmt_reset(stmt) != 0) {
                 unsigned int error_code = mysql_stmt_errno(stmt);
@@ -25,10 +29,10 @@ void Connection::execute_prepared(std::string_view sql, Args&&... params) {
                 }
                 throw_stmt_error(stmt, "Failed to reset prepared statement");
             }
-            
+
             // 绑定参数
-            prepare_and_bind_params(stmt, std::forward<Args>(params)...);
-            
+            bind_fn(stmt);
+
             // 执行语句
             if (mysql_stmt_execute(stmt) != 0) {
                 unsigned int error_code = mysql_stmt_errno(stmt);
@@ -39,18 +43,12 @@ void Connection::execute_prepared(std::string_view sql, Args&&... params) {
                 }
                 throw_stmt_error(stmt, "Failed to execute prepared statement");
             }
-            
+
             // 对于非查询语句，释放结果(如果有)
-            if (mysql_stmt_field_count(stmt) == 0) {
-                // 这是非查询语句(INSERT/UPDATE/DELETE)
-                mysql_stmt_free_result(stmt);
-            } else {
-                // 这是查询语句但在execute_prepared中调用，释放结果
-                mysql_stmt_free_result(stmt);
-            }
-            
+            mysql_stmt_free_result(stmt);
+
             break; // 成功执行，退出重试循环
-            
+
         } catch (const SQLException& e) {
             if (retry_attempted) {
                 throw; // 已经重试过，重新抛出异常
@@ -60,14 +58,14 @@ void Connection::execute_prepared(std::string_view sql, Args&&... params) {
     }
 }
 
-template <typename... Args>
-std::unique_ptr<ResultSet> Connection::query_prepared(std::string_view sql, Args&&... params) {
+template <typename BindFn>
+std::unique_ptr<ResultSet> Connection::query_prepared_with(std::string_view sql, BindFn&& bind_fn) {
     bool retry_attempted = false;
-    
+
     while (true) {
         try {
             MYSQL_STMT* stmt = get_or_prepare_stmt(sql);
-            
+
             // 重置语句状态
             if (mysql_stmt_reset(stmt) != 0) {
                 unsigned int error_code = mysql_stmt_errno(stmt);
@@ -78,10 +76,10 @@ std::unique_ptr<ResultSet> Connection::query_prepared(std::string_view sql, Args
                 }
                 throw_stmt_error(stmt, "Failed to reset prepared statement");
             }
-            
+
             // 绑定参数
-            prepare_and_bind_params(stmt, std::forward<Args>(params)...);
-            
+            bind_fn(stmt);
+
             // 执行语句
             if (mysql_stmt_execute(stmt) != 0) {
                 unsigned int error_code = mysql_stmt_errno(stmt);
@@ -92,18 +90,18 @@ std::unique_ptr<ResultSet> Connection::query_prepared(std::string_view sql, Args
                 }
                 throw_stmt_error(stmt, "Failed to execute prepared statement");
             }
-            
+
             // 检查是否为查询语句
             if (mysql_stmt_field_count(stmt) == 0) {
                 throw QueryException("Statement does not return a result set");
             }
-            
+
             // 设置属性以获取正确的列长度
             bool update_max_length = true;
             if (mysql_stmt_attr_set(stmt, STMT_ATTR_UPDATE_MAX_LENGTH, &update_max_length) != 0) {
                 throw_stmt_error(stmt, "Failed to set statement attribute");
             }
-            
+
             // 存储结果
             if (mysql_stmt_store_result(stmt) != 0) {
                 unsigned int error_code = mysql_stmt_errno(stmt);
@@ -114,10 +112,10 @@ std::unique_ptr<ResultSet> Connection::query_prepared(std::string_view sql, Args
                 }
                 throw_stmt_error(stmt, "Failed to store prepared statement result");
             }
-            
+
             // 创建并返回ResultSet
             return std::make_unique<ResultSet>(stmt);
-            
+
         } catch (const SQLException& e) {
             if (retry_attempted) {
                 throw; // 已经重试过，重新抛出异常
@@ -125,6 +123,20 @@ std::unique_ptr<ResultSet> Connection::query_prepared(std::string_view sql, Args
             throw; // 非可恢复异常，直接抛出
         }
     }
+}
+
+template <typename... Args, typename>
+void Connection::execute_prepared(std::string_view sql, Args&&... params) {
+    execute_prepared_with(sql, [&](MYSQL_STMT* stmt) {
+        prepare_and_bind_params(stmt, std::forward<Args>(params)...);
+    });
+}
+
+template <typename... Args, typename>
+std::unique_ptr<ResultSet> Connection::query_prepared(std::string_view sql, Args&&... params) {
+    return query_prepared_with(sql, [&](MYSQL_STMT* stmt) {
+        prepare_and_bind_params(stmt, std::forward<Args>(params)...);
+    });
 }
 
 // 参数绑定的特化实现

@@ -370,12 +370,65 @@ void Connection::bind_parameters(MYSQL_STMT* stmt, std::vector<MYSQL_BIND>& bind
     if (binds.empty()) {
         return;
     }
-    
+
     if (mysql_stmt_bind_param(stmt, binds.data()) != 0) {
         throw_stmt_error(stmt, "Failed to bind parameters");
     }
 }
 
-// All template implementations moved to connection_prepared.hpp
+void Connection::bind_params_runtime(MYSQL_STMT* stmt, const std::vector<Param>& params) {
+    const size_t expected = mysql_stmt_param_count(stmt);
+    if (params.size() != expected) {
+        // 动态拼接 SQL 时占位符个数和参数个数对不上是高频 bug,
+        // 报错带上两边实际个数便于排查 (与变参模板版的措辞保持一致)。
+        throw SQLException("Parameter count mismatch: expected " +
+            std::to_string(expected) + ", got " + std::to_string(params.size()));
+    }
+
+    if (params.empty()) {
+        return;  // 空 vector 合法, 等价于无参调用
+    }
+
+    // 缓冲区管理与 prepare_and_bind_params 完全一致: reserve 到参数个数,
+    // 保证 emplace_back 不触发重分配, bind 里保存的 buffer 指针才稳定。
+    param_binds_.resize(params.size());
+    param_string_buffers_.clear();
+    param_string_buffers_.reserve(params.size());
+    param_scalar_buffers_.clear();
+    param_scalar_buffers_.reserve(params.size());
+    std::memset(param_binds_.data(), 0, sizeof(MYSQL_BIND) * params.size());
+
+    for (size_t i = 0; i < params.size(); ++i) {
+        std::visit([&](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                bind_param(param_binds_[i], nullptr, param_string_buffers_);
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                // 接口收 const&, 不能移走调用方的字符串; 走 string_view 特化
+                // 拷贝一次进 param_string_buffers_。
+                bind_param(param_binds_[i], std::string_view(v), param_string_buffers_);
+            } else {
+                // int / long long / double: 拷贝标量, 走对应特化占槽。
+                bind_param(param_binds_[i], T(v), param_string_buffers_);
+            }
+        }, params[i]);
+    }
+
+    bind_parameters(stmt, param_binds_);
+}
+
+void Connection::execute_prepared(std::string_view sql, const std::vector<Param>& params) {
+    execute_prepared_with(sql, [&](MYSQL_STMT* stmt) {
+        bind_params_runtime(stmt, params);
+    });
+}
+
+std::unique_ptr<ResultSet> Connection::query_prepared(std::string_view sql, const std::vector<Param>& params) {
+    return query_prepared_with(sql, [&](MYSQL_STMT* stmt) {
+        bind_params_runtime(stmt, params);
+    });
+}
+
+// Variadic template implementations live in connection_prepared.hpp
 
 }  // namespace fox::mysql

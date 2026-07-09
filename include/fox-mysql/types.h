@@ -1,9 +1,25 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <string>
+#include <variant>
 
 namespace fox::mysql {
+
+// 运行时动态参数值, 用于 execute_prepared / query_prepared 的 vector<Param> 重载
+// (参数个数在运行时决定的场景: 动态 IN 列表、可选过滤条件、批量插入)。
+//
+// 类型集合与变参模板版的 bind_param 特化对齐:
+//   nullptr_t → MYSQL_TYPE_NULL, int → LONG, long long → LONGLONG,
+//   double → DOUBLE, std::string → STRING
+// float / const char* / string_view 构造时分别隐式收敛到 double / std::string。
+//
+// 注意: 无符号整型 (unsigned, size_t) 构造 Param 会因 int/long long/double
+// 三者转换级别相同而编译报 ambiguous, 调用方需显式 cast 到上述某个类型。
+//
+// 默认构造 = nullptr_t = SQL NULL。
+using Param = std::variant<std::nullptr_t, int, long long, double, std::string>;
 
 struct ConnectionConfig {
     std::string host = "localhost";
